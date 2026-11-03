@@ -1,0 +1,83 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 70px;
+  padding: 0 32px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+.context {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.context strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.separator { color: #b6b9b0; }
+.actions { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.header .backup { display: none; }
+.profile { display: flex; align-items: center; gap: 10px; }
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e7ddd1;
+  border-radius: 50%;
+  background: #f7f1e9;
+  color: #8d471e;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.3px;
+}
+.meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.name {
+  display: block;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.role { display: block; font-size: 10px; color: var(--muted); line-height: 1.4; }
+.controls { border-left: 1px solid var(--line); margin-left: 4px; padding-left: 12px; }
+.header .logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-color: transparent;
+  color: #747b6d;
+}
+.header .logout:hover:not(:disabled) { background: #f1f2ed; color: var(--ink); }
+@media (max-width: 1100px) {
+  .header { padding: 0 24px; }
+  .header .backup { display: inline-flex; }
+}
+@media (max-width: 640px) {
+  .header { min-height: 64px; padding: 0 16px; gap: 12px; }
+  .contextLabel, .separator { display: none; }
+  .context { flex: 1; font-size: 12px; }
+  .actions, .profile { gap: 8px; }
+  .avatar { width: 32px; height: 32px; flex-basis: 32px; font-size: 11px; }
+  .name { max-width: 90px; font-size: 12px; }
+  .role { font-size: 9px; }
+  .controls { padding-left: 6px; margin-left: 0; }
+}

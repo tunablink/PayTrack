@@ -1,0 +1,14 @@
+# Use together with compose.yaml. Set APP_ORIGIN=https://your-domain and COOKIE_SECURE=true.
+services:
+  proxy:
+    image: caddy:2.10-alpine
+    ports: !override ["80:80", "443:443", "443:443/udp"]
+    volumes: !override
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN to your DNS hostname}
+volumes:
+  caddy-data:
+  caddy-config:

@@ -1,0 +1,9 @@
+{$DOMAIN} {
+    encode zstd gzip
+    header X-Content-Type-Options nosniff
+    @backend path /api/* /ws
+    reverse_proxy @backend backend:8000 {
+        header_up X-Real-IP {remote_host}
+    }
+    reverse_proxy frontend:3000
+}

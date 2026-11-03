@@ -1,0 +1,13 @@
+.git
+.venv
+.npm-cache
+**/node_modules
+**/.next
+**/__pycache__
+data
+backups
+.env
+**/.env.local
+stitch_javafx_payment_tracker_dashboard
+**/test-results
+**/playwright-report
