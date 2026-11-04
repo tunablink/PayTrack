@@ -15,7 +15,7 @@ def setup(tmp_path):
     with TestClient(app) as client:
         password = secrets.token_urlsafe(24)
         with app.state.repo.connect() as conn:
-            conn.execute('INSERT INTO owner VALUES (1,?,?)',('owner',hasher.hash(password)))
+            conn.execute('INSERT INTO users(id,username,password_hash,is_admin) VALUES (1,?,?,1)',('owner',hasher.hash(password)))
             conn.commit()
         yield client,app,password
 

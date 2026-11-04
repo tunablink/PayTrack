@@ -25,7 +25,11 @@ Mở **http://localhost:3000**. Origin mặc định chính xác là địa ch�
 
 Trên Linux: `python3 -m venv .venv`, `.venv/bin/python`, `npm`; các lệnh còn lại giống nhau. Chạy CLI và backend từ `backend/` để DATA_DIR mặc định trỏ tới `data/` ở gốc repository. Có thể đặt DATA_DIR là đường dẫn tuyệt đối bên ngoài repository.
 
-Tài khoản chỉ được tạo bằng `python -m app.cli setup`, nhập username và mật khẩu bằng prompt, không truyền password trên command line. Mật khẩu tối thiểu 12 ký tự, nhập xác nhận; CLI từ chối khi đã có owner. Không có đăng ký công khai hoặc tài khoản mặc định.
+Một người có thể đăng ký nhiều tài khoản tại **http://localhost:3000/register** hoặc bấm **Đăng ký tài khoản** trên trang đăng nhập. Mỗi tài khoản cần tên đăng nhập khác nhau, mật khẩu tối thiểu 12 ký tự và xác nhận khớp. Sau khi tạo thành công, bấm **Đăng nhập**. Đăng ký không đóng khi đã có tài khoản. Đơn vị, khoản phải thu và thống kê được tách riêng theo tài khoản; đăng xuất rồi đăng nhập tài khoản khác để chuyển không gian dữ liệu. Giới hạn 10 yêu cầu đăng ký hợp lệ về schema/IP/15 phút để tránh lạm dụng; tên đăng nhập trùng trả lỗi và cho phép sửa tên ngay trong form.
+
+Lệnh `python -m app.cli setup` tạo tài khoản quản trị ban đầu qua terminal bằng getpass, chỉ khi chưa có tài khoản. Tài khoản cũ hoặc tài khoản đầu tiên trên database trống giữ quyền quản trị chức năng sao lưu toàn hệ thống. Các tài khoản đăng ký sau không có quyền backup/status toàn hệ thống và không thấy nút sao lưu. Quyền quản trị không cho phép truy cập đơn vị/khoản thu của tài khoản khác qua API nghiệp vụ.
+
+**Nâng cấp database cũ:** dừng backend rồi chạy lại. Migration 002 tự tạo `DATA_DIR/backups/pre-migration-002-<id>.sqlite3` bằng SQLite backup API trước khi chuyển database phiên bản 1 sang 2. Username, hash mật khẩu, đơn vị, khoản thu, phiên bản bản ghi và session hợp lệ được giữ; dữ liệu cũ thuộc tài khoản ban đầu. Không xóa database để mở đăng ký. Nếu dùng Docker, dựng lại image và recreate backend với nguyên volume dữ liệu.
 
 ## Docker local
 

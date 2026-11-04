@@ -6,7 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const frontend = path.join(root, 'frontend');
-const env = { ...process.env, E2E_PASSWORD: randomBytes(24).toString('base64url'), E2E_EXTERNAL_SERVERS: '1', PYTHONUTF8: '1' };
+const env = { ...process.env, E2E_PASSWORD: randomBytes(24).toString('base64url'), E2E_EXTERNAL_SERVERS: '1', E2E_ISOLATED_DATA: '1', PYTHONUTF8: '1' };
 const children = [];
 function launch(executable, args, cwd, extraEnv = {}) {
   const child = spawn(executable, args, { cwd, env: {...env, ...extraEnv}, stdio: 'inherit', windowsHide: true });

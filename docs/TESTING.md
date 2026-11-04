@@ -68,3 +68,28 @@ docker compose --env-file .env -f deploy/compose.yaml up -d --force-recreate
 ```
 
 Xem OPERATIONS.md cho HTTPS override, backup/restore và update. Không dùng down -v trong quy trình kiểm tra persistence.
+
+## Bổ sung 04/11/2026 — Đăng ký đầu tiên
+
+Backend hiện đạt **34 passed**, gồm 9 trường hợp mới: tạo owner đầu tiên, trim tên/hash Argon2/đăng nhập, tự đóng đăng ký, 6 dữ liệu không hợp lệ, CSRF/Origin và hai request cạnh tranh (chỉ 201 + 409). Lỗi validation không phản chiếu mật khẩu về client. Tất cả chạy trên database tạm.
+
+Playwright riêng cho đăng ký đạt **4 passed (22.6s)** trên desktop/mobile: link đăng ký khi chưa có owner, xác nhận mật khẩu sai, submit thành công, quay về đăng nhập, không có link khi đã có owner, /register bị đóng và trường hợp backend đóng đăng ký khi form đang mở. Các test trình bày này mock endpoints auth, không truy cập tài khoản/dữ liệu thật; backend API thật được kiểm tra ở pytest. Ảnh form đã được xem tại docs/screenshots/register-desktop.png và register-mobile.png.
+
+Production build thành công với route /register. Để backend đang chạy nhận endpoint mới, khởi động lại Uvicorn nếu không dùng --reload. Khi đã có owner trong database thực, đăng ký đóng theo thiết kế; có thể thử luồng mở bằng database demo riêng qua DATA_DIR.
+
+## Cập nhật nhiều tài khoản — 04/11/2026
+
+Phần này thay thế quy tắc đăng ký chủ sở hữu đầu tiên ở mục cập nhật trước. Đăng ký hiện luôn mở, mỗi username tạo một không gian dữ liệu riêng; tài khoản ban đầu giữ quyền sao lưu toàn database.
+
+- Backend: **38 passed**, gồm migration v1→v2 bảo toàn tài khoản/hash/session/dữ liệu/phiên bản/idempotency và tạo backup trước migration, hai tài khoản độc lập, chặn đọc/sửa/xóa ID tài khoản khác, FK chặn liên kết chéo, idempotency theo user_id, chuyển đăng nhập thu hồi phiên cũ, duplicate/race/rate-limit đăng ký.
+- Frontend typecheck/lint/production build: đạt.
+- Playwright UI header + đăng ký: **6 passed (38.9s)** trên desktop/mobile, có endpoint giả lập để kiểm tra hiển thị, form tiếp tục mở và tên đăng nhập trùng.
+- Playwright E2E **thật** nhiều tài khoản: **2 passed (46.7s)** trên desktop/mobile. Đăng ký A/B, đăng nhập A tạo đơn vị và khoản thu 24.690 đồng, đăng nhập B kiểm tra danh sách/tổng rỗng, đăng nhập lại A đối chiếu tổng và dữ liệu còn nguyên; cả hai tài khoản mới không có nút sao lưu toàn hệ thống.
+- Do dev server đang chiếm cổng 3000/8000, E2E nhiều tài khoản chạy backend thực trên cổng 18100 với database tạm của tests.e2e_server. Playwright chuyển tiếp auth HTTP và WebSocket tới backend tạm, không giả lập kết quả nghiệp vụ và không ghi database sử dụng thực tế. Backend tạm đã dừng sau kiểm thử.
+- Test tests/multi-account.spec.ts chỉ chạy khi E2E_ISOLATED_DATA=1; npm run test:e2e tự đặt cờ này và tự tạo database tạm. Có thể dùng E2E_BACKEND_URL với một backend tạm riêng khi frontend dev đang chạy. Không đặt cờ này để chạy lên backend có dữ liệu thật.
+
+## Bổ sung 04/11/2026 — Biểu đồ báo cáo
+
+Bốn kiểm thử Playwright riêng cho biểu đồ đạt **4 passed (17.6s)** trên desktop/mobile. Các trường hợp: tháng/quý, Q1 cộng đúng 3.000.000 đồng đã nhận và 500.000 đồng chưa nhận từ nhiều tháng; tỷ lệ đã nhận 70,6%; xếp hạng chưa nhận 60%/40%; bật đường tổng; số liệu thay đổi theo đơn vị/trạng thái/ngày; bộ lọc không có dữ liệu; khoản 0 đồng không sinh NaN/Infinity; không tràn ngang toàn trang. Đã sửa việc hover chuột ghi đè lựa chọn đang focus bằng bàn phím.
+
+Test dùng summary fixtures được phân biệt trong tests/report-charts.spec.ts, chỉ phục vụ UI. Sản phẩm lấy trực tiếp summary của backend, không có dữ liệu mẫu được nhúng vào component. Các bảng đối chiếu hiện có được giữ lại để xem số chính xác. Không đổi schema hay API, không thêm thư viện. Ảnh runtime ở docs/screenshots/report-charts-desktop.png và report-charts-mobile.png; đã xem cả hai. Production build thành công.

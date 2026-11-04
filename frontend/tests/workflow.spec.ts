@@ -21,7 +21,7 @@ test("đăng nhập → đơn vị → khoản phải thu → đã nhận → b�
   await expect(page.getByText("Đã kết nối", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Thêm đơn vị", exact: true }).click();
   const org = `Đại học Kiểm thử ${testInfo.project.name}`;
-  await page.getByLabel("Tên đơn vị *").fill(org);
+  await page.getByLabel("Tên tổ chức *").fill(org);
   await page
     .getByLabel("Ghi chú", { exact: true })
     .fill("Ghi chú tiếng Việt dài ".repeat(30));
@@ -29,15 +29,15 @@ test("đăng nhập → đơn vị → khoản phải thu → đã nhận → b�
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByText(org, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Thêm đơn vị", exact: true }).click();
-  await page.getByLabel("Tên đơn vị *").fill("Không lưu");
+  await page.getByLabel("Tên tổ chức *").fill("Không lưu");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("button", { name: "Thêm đơn vị", exact: true }).click();
-  await expect(page.getByLabel("Tên đơn vị *")).toHaveValue("");
+  await expect(page.getByLabel("Tên tổ chức *")).toHaveValue("");
   await page.getByRole("button", { name: "Hủy", exact: true }).click();
   await page
     .getByRole("navigation")
-    .getByRole("link", { name: "Khoản phải thu", exact: true })
+    .getByRole("link", { name: "Quản lí khoản thu", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Thêm khoản phải thu", exact: true })
@@ -68,22 +68,28 @@ test("đăng nhập → đơn vị → khoản phải thu → đã nhận → b�
   await page.getByRole("button", { name: "Xác nhận", exact: true }).click();
   await expect(received).toBeChecked();
   await expect(row.getByText("Đã nhận", { exact: true })).toBeVisible();
-  await row.getByRole('button', {name:/^Xem /}).click();
-  await expect(page.getByRole('dialog')).toContainText('4.000.000');
-  await page.getByRole('button',{name:'Đóng',exact:true}).last().click();
-  await row.getByRole('button',{name:'Sửa',exact:true}).click();
-  await expect(page.getByLabel('Nội dung công việc *')).toContainText('Giảng dạy');
-  await page.getByLabel('Nội dung công việc *').fill('Giảng dạy chuyên đề và đối soát công việc '.repeat(7)+'Đã đối chiếu');
-  await page.getByRole('button',{name:'Lưu',exact:true}).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(row).toContainText('Đã đối chiếu');
+  await row.getByRole("button", { name: /^Xem / }).click();
+  await expect(page.getByRole("dialog")).toContainText("4.000.000");
+  await page.getByRole("button", { name: "Đóng", exact: true }).last().click();
+  await row.getByRole("button", { name: "Sửa", exact: true }).click();
+  await expect(page.getByLabel("Nội dung công việc *")).toContainText(
+    "Giảng dạy",
+  );
+  await page
+    .getByLabel("Nội dung công việc *")
+    .fill(
+      "Giảng dạy chuyên đề và đối soát công việc ".repeat(7) + "Đã đối chiếu",
+    );
+  await page.getByRole("button", { name: "Lưu", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(row).toContainText("Đã đối chiếu");
   await received.click();
-  await page.getByRole('button',{name:'Xác nhận',exact:true}).click();
-  await expect(row.getByText('Chưa nhận',{exact:true})).toBeVisible();
+  await page.getByRole("button", { name: "Xác nhận", exact: true }).click();
+  await expect(row.getByText("Chưa nhận", { exact: true })).toBeVisible();
   await expect(received).not.toBeChecked();
   await received.click();
-  await page.getByRole('button',{name:'Xác nhận',exact:true}).click();
-  await expect(row.getByText('Đã nhận',{exact:true})).toBeVisible();
+  await page.getByRole("button", { name: "Xác nhận", exact: true }).click();
+  await expect(row.getByText("Đã nhận", { exact: true })).toBeVisible();
   await expect(received).toBeChecked();
   await page
     .getByRole("navigation")
@@ -105,20 +111,19 @@ test("đăng nhập → đơn vị → khoản phải thu → đã nhận → b�
     .getByRole("link", { name: "Báo cáo", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Đối chiếu theo đơn vị" }),
+    page.getByRole("heading", { name: "Diễn biến dòng tiền" }),
   ).toBeVisible();
   await page
-    .getByRole("combobox", { name: "Đơn vị", exact: true })
+    .getByRole("combobox", { name: "Đối tác", exact: true })
     .selectOption({ label: org });
   await expect(page.locator(".metric").nth(0)).toContainText("4.000.000");
   await expect(page.locator(".metric").nth(1)).toContainText("4.000.000");
   await expect(page.locator(".metric").nth(2)).toContainText("0");
-  await page.getByRole('combobox',{name:'Trạng thái',exact:true}).selectOption('PAID');
-  await page.getByLabel('Đến ngày',{exact:true}).fill('2026-12-31');
-  await page.getByLabel('Từ ngày',{exact:true}).fill('2026-12-01');
-  await expect(page.locator('.metric').nth(0)).toContainText('0 khoản');
-  await page.getByLabel('Từ ngày',{exact:true}).fill('2026-11-01');
-  await expect(page.locator('.metric').nth(0)).toContainText('4.000.000');
+  await expect(page.locator(".metric").nth(3)).toContainText("100%");
+  await page.getByRole("combobox", { name: "Khoảng thời gian", exact: true }).selectOption("quarter");
+  await expect(page.getByTestId("report-period-2026-Q4")).toBeVisible();
+  await page.getByRole("combobox", { name: "Khoảng thời gian", exact: true }).selectOption("year");
+  await expect(page.locator(".metric").nth(0)).toContainText("4.000.000");
   await page.screenshot({
     path: `../docs/screenshots/reports-${testInfo.project.name}.png`,
     fullPage: true,
@@ -130,7 +135,7 @@ test("đăng nhập → đơn vị → khoản phải thu → đã nhận → b�
   ).toBeTruthy();
   await page
     .getByRole("navigation")
-    .getByRole("link", { name: "Khoản phải thu", exact: true })
+    .getByRole("link", { name: "Quản lí khoản thu", exact: true })
     .click();
   await expect(page.getByText("Đã kết nối", { exact: true })).toBeVisible();
   await page.getByLabel("Tìm công việc").fill("Không tồn tại");
@@ -173,15 +178,26 @@ test("đăng nhập → đơn vị → khoản phải thu → đã nhận → b�
       .last()
       .click();
   }
-  await page.getByRole('row').filter({hasText:org}).getByRole('button',{name:'Xóa',exact:true}).click();
-  await page.getByRole('button',{name:'Xác nhận',exact:true}).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByRole('row').filter({hasText:org})).toHaveCount(0);
-  await page.getByRole('navigation').getByRole('link',{name:'Đơn vị',exact:true}).click();
-  await page.getByRole('row').filter({hasText:org}).getByRole('button',{name:'Xóa',exact:true}).click();
-  await page.getByRole('button',{name:'Xác nhận',exact:true}).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByRole('row').filter({hasText:org})).toHaveCount(0);
+  await page
+    .getByRole("row")
+    .filter({ hasText: org })
+    .getByRole("button", { name: "Xóa", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Xác nhận", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("row").filter({ hasText: org })).toHaveCount(0);
+  await page
+    .getByRole("navigation")
+    .getByRole("link", { name: "Đơn vị", exact: true })
+    .click();
+  await page
+    .getByRole("row")
+    .filter({ hasText: org })
+    .getByRole("button", { name: "Xóa", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Xác nhận", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("row").filter({ hasText: org })).toHaveCount(0);
   await page.getByRole("button", { name: "Đăng xuất", exact: true }).click();
   await expect(page).toHaveURL(/login/);
   expect(consoleErrors).toEqual([]);
@@ -214,7 +230,7 @@ test("WebSocket timeout không báo lưu thành công và tự kết nối lại
     .click();
   await expect(page.getByText("Đã kết nối", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Thêm đơn vị", exact: true }).click();
-  await page.getByLabel("Tên đơn vị *").fill(lostName);
+  await page.getByLabel("Tên tổ chức *").fill(lostName);
   await page.getByRole("button", { name: "Lưu", exact: true }).click();
   await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
     "Kết quả lưu chưa xác định",

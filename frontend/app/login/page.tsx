@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, Field } from "@/components/ui";
 import { ArrowRight, Wallet } from "lucide-react";
+import styles from "@/components/auth-page.module.css";
 export default function Login() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -33,15 +35,14 @@ export default function Login() {
     }
   }
   return (
-    <main className="min-h-screen grid place-items-center p-5">
-      <section className="login-panel">
-        <div className="brand mb-8">
-          <span className="brand-icon">
-            <Wallet size={21} />
+    <main className={styles.page}>
+        <div className={styles.brand}>
+          <span>
+            <Wallet size={24} />
           </span>
           PayTrack
         </div>
-        <p className="eyebrow">KHÔNG GIAN CÁ NHÂN</p>
+      <section className={styles.panel}>
         <h1 className="mt-2 mb-2">Đăng nhập</h1>
         <p className="muted mb-7">
           Quản lý công việc và các khoản phải thu của bạn.
@@ -75,9 +76,13 @@ export default function Login() {
             <ArrowRight size={17} />
           </Button>
         </form>
-        <p className="muted text-xs mt-7">
-          Tài khoản chủ sở hữu được tạo bằng lệnh setup.
-        </p>
+        <div className="mt-7">
+          <p className="muted text-xs mb-2">Chưa có tài khoản chủ sở hữu?</p>
+          <Link href="/register" className="text-link">
+            Đăng ký tài khoản
+            <ArrowRight size={15} />
+          </Link>
+        </div>
       </section>
     </main>
   );

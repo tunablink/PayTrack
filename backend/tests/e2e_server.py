@@ -16,6 +16,6 @@ if __name__=='__main__':
         settings=Settings(data_dir=Path(directory),origin='http://localhost:3000')
         repo=Repository(settings.db);repo.migrate()
         with repo.connect() as conn:
-            conn.execute('INSERT INTO owner VALUES (1,?,?)',('e2e-owner',hasher.hash(password)))
+            conn.execute('INSERT INTO users(id,username,password_hash,is_admin) VALUES (1,?,?,1)',('e2e-owner',hasher.hash(password)))
             conn.commit()
-        uvicorn.run(create_app(settings),host='127.0.0.1',port=8000,log_level='warning')
+        uvicorn.run(create_app(settings),host='127.0.0.1',port=int(os.environ.get('E2E_BACKEND_PORT','8000')),log_level='warning')

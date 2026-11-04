@@ -9,6 +9,7 @@ class Settings:
     origin: str = os.getenv('APP_ORIGIN', 'http://localhost:3000')
     secure: bool = os.getenv('COOKIE_SECURE', 'false').lower() == 'true'
     session_seconds: int = int(os.getenv('SESSION_SECONDS', '28800'))
+    ws_ticket_auth: bool = os.getenv('WS_TICKET_AUTH', 'false').lower() == 'true'
 
     @property
     def db(self):

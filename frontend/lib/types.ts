@@ -1,11 +1,19 @@
 export type Organization = {
   id: number;
   name: string;
+  organization_type: string;
+  representative: string;
+  contact_email: string;
+  contact_phone: string;
+  address: string;
+  status: "ACTIVE" | "INACTIVE";
   notes: string;
   version: number;
   created_at: string;
   updated_at: string;
 };
+export const organizationStatusLabel = (status: Organization["status"]) =>
+  status === "INACTIVE" ? "Ngừng hoạt động" : "Đang hoạt động";
 export type Payment = {
   id: number;
   organization_id: number;
@@ -15,6 +23,7 @@ export type Payment = {
   unit_price: number;
   amount: number;
   work_date: string;
+  due_date: string | null;
   status: "PAID" | "UNPAID";
   version: number;
   created_at: string;

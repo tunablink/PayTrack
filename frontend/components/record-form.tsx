@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button, Field } from "./ui";
 import { Organization, Payment, money } from "@/lib/types";
 export function RecordForm({
@@ -19,6 +19,7 @@ export function RecordForm({
 }) {
   const payment = record as Payment | undefined,
     org = record as Organization | undefined;
+  const organizationTypesId = useId();
   const [quantity, setQuantity] = useState(payment?.quantity || "1");
   const [price, setPrice] = useState(String(payment?.unit_price || 0));
   // Integer thousandths provide a display preview; backend Decimal remains authoritative.
@@ -38,13 +39,23 @@ export function RecordForm({
     const f = new FormData(e.currentTarget);
     const payload =
       kind === "organization"
-        ? { name: f.get("name"), notes: f.get("notes") }
+        ? {
+            name: f.get("name"),
+            organization_type: f.get("organization_type"),
+            representative: f.get("representative"),
+            contact_email: f.get("contact_email"),
+            contact_phone: f.get("contact_phone"),
+            address: f.get("address"),
+            notes: f.get("notes"),
+            status: f.get("status"),
+          }
         : {
             organization_id: Number(f.get("organization_id")),
             description: f.get("description"),
             quantity: f.get("quantity"),
             unit_price: Number(f.get("unit_price")),
             work_date: f.get("work_date"),
+            due_date: f.get("due_date") || null,
             status: f.get("status"),
           };
     onSave({
@@ -62,7 +73,7 @@ export function RecordForm({
     <form onSubmit={submit} className="grid gap-4">
       {kind === "organization" ? (
         <>
-          <Field label="Tên đơn vị *">
+          <Field label="Tên tổ chức *">
             <input
               name="name"
               required
@@ -71,13 +82,74 @@ export function RecordForm({
               autoFocus
             />
           </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Loại hình">
+              <input
+                name="organization_type"
+                list={organizationTypesId}
+                maxLength={100}
+                defaultValue={org?.organization_type}
+                placeholder="Chọn hoặc nhập loại hình"
+              />
+            </Field>
+            <datalist id={organizationTypesId}>
+              {[
+                "Doanh nghiệp",
+                "Trường học",
+                "Cơ quan nhà nước",
+                "Cá nhân",
+                "Tổ chức khác",
+              ].map((type) => (
+                <option value={type} key={type} />
+              ))}
+            </datalist>
+            <Field label="Người đại diện">
+              <input
+                name="representative"
+                maxLength={200}
+                defaultValue={org?.representative}
+              />
+            </Field>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Email">
+              <input
+                name="contact_email"
+                type="email"
+                maxLength={254}
+                defaultValue={org?.contact_email}
+              />
+            </Field>
+            <Field label="Số điện thoại">
+              <input
+                name="contact_phone"
+                type="tel"
+                maxLength={50}
+                defaultValue={org?.contact_phone}
+              />
+            </Field>
+          </div>
+          <Field label="Địa chỉ">
+            <textarea
+              name="address"
+              rows={2}
+              maxLength={500}
+              defaultValue={org?.address}
+            />
+          </Field>
           <Field label="Ghi chú">
             <textarea
               name="notes"
-              rows={4}
+              rows={3}
               maxLength={2000}
               defaultValue={org?.notes}
             />
+          </Field>
+          <Field label="Trạng thái">
+            <select name="status" defaultValue={org?.status || "ACTIVE"}>
+              <option value="ACTIVE">Đang hoạt động</option>
+              <option value="INACTIVE">Ngừng hoạt động</option>
+            </select>
           </Field>
         </>
       ) : (
@@ -154,6 +226,9 @@ export function RecordForm({
               </select>
             </Field>
           </div>
+          <Field label="Hạn TT">
+            <input name="due_date" type="date" title="Hạn thanh toán" defaultValue={payment?.due_date || ""} />
+          </Field>
           <p className="muted text-xs">
             Làm tròn tới đồng. Thành tiền được backend tính khi lưu.
           </p>

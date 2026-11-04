@@ -1,18 +1,18 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowDownLeft,
-  ArrowRight,
-  ArrowUpRight,
   Building2,
   Check,
   ChevronLeft,
   ChevronRight,
   DatabaseBackup,
+  Download,
   Eye,
   LayoutDashboard,
+  Mail,
+  Phone,
   Pencil,
   Plus,
   ReceiptText,
@@ -31,10 +31,16 @@ import {
   money,
   day,
   timestamp,
+  organizationStatusLabel,
 } from "@/lib/types";
 import { Badge, Button, Dialog, Empty, Field } from "./ui";
 import { RecordForm } from "./record-form";
 import WorkspaceHeader from "./workspace-header";
+import Dashboard from "./dashboard";
+import ReportCharts from "./report-charts";
+import ReportOverview from "./report-overview";
+import { downloadReport, localReportDate, reportDateRange, type ReportMode } from "@/lib/reports";
+import organizationStyles from "./organizations-table.module.css";
 type View = "dashboard" | "organizations" | "payments" | "reports";
 type Modal =
   | { kind: "organization" | "payment"; record?: Organization | Payment }
@@ -43,7 +49,7 @@ type Modal =
 const titles: Record<View, string> = {
   dashboard: "Tổng quan",
   organizations: "Đơn vị",
-  payments: "Khoản phải thu",
+  payments: "Quản lí khoản thu",
   reports: "Báo cáo",
 };
 const descriptions: Record<View, string> = {
@@ -72,10 +78,31 @@ export default function Workspace({ view }: { view: View }) {
   const sequence = useRef(0);
   const [connection, setConnection] = useState<Connection>("connecting");
   const [username, setUsername] = useState("");
+  const [canBackup, setCanBackup] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [payments, setPayments] = useState<PaymentList | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [dashboardRevision, setDashboardRevision] = useState(0);
+  const loadDashboardPayments = useCallback((payload: Record<string, unknown>) => socket.current!.request<PaymentList>("payment.list", payload), []);
   const [filters, setFilters] = useState<Filters>(blankFilters);
+  const [organizationType, setOrganizationType] = useState("");
+  const [organizationStatus, setOrganizationStatus] = useState("");
+  const organizationTypes = [...new Set(organizations.map(org => org.organization_type?.trim()).filter((value): value is string => Boolean(value)))].sort((a, b) => a.localeCompare(b, "vi"));
+  const filteredOrganizations = organizations.filter(org =>
+    org.name.toLocaleLowerCase("vi").includes(filters.search.trim().toLocaleLowerCase("vi")) &&
+    (!organizationType || org.organization_type?.trim() === organizationType) &&
+    (!organizationStatus || org.status === organizationStatus)
+  );
+  const [reportYear, setReportYear] = useState(() => localReportDate().year);
+  const [reportMode, setReportMode] = useState<ReportMode>("year");
+  const [reportPartner, setReportPartner] = useState("");
+  const [reportYears, setReportYears] = useState<string[]>([]);
+  const [loadedReportKey, setLoadedReportKey] = useState("");
+  const reportPayload = useMemo(() => ({
+    ...reportDateRange(reportYear, reportMode),
+    ...(reportPartner ? { organization_id: Number(reportPartner) } : {}),
+  }), [reportYear, reportMode, reportPartner]);
+  const reportKey = JSON.stringify(reportPayload);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -94,28 +121,41 @@ export default function Workspace({ view }: { view: View }) {
     if (client?.socket?.readyState !== WebSocket.OPEN) return;
     const current = ++sequence.current;
     setLoading(true);
-    const payload = Object.fromEntries(
+    const payload = view === "reports" ? reportPayload : Object.fromEntries(
       Object.entries(filters)
         .filter(([, v]) => v !== "")
         .map(([k, v]) => [k, k === "organization_id" ? Number(v) : v]),
     );
     try {
-      const [orgs, list, totals] = await Promise.all([
+      if (view === "dashboard") {
+        const orgs = await client.request<Organization[]>("organization.list", {});
+        if (current === sequence.current) {
+          setOrganizations(orgs);
+          setDashboardRevision(value => value + 1);
+        }
+        return;
+      }
+      const [orgs, list, totals, years] = await Promise.all([
         client.request<Organization[]>("organization.list", {}),
         client.request<PaymentList>("payment.list", {
           ...payload,
           page,
-          page_size: view === "dashboard" ? 5 : 20,
+          page_size: 20,
         }),
         client.request<Summary>(
           view === "reports" ? "report.summary" : "dashboard.summary",
           payload,
         ),
+        view === "reports" ? client.request<string[]>("report.years", {}) : Promise.resolve([]),
       ]);
       if (current === sequence.current) {
         setOrganizations(orgs);
         setPayments(list);
         setSummary(totals);
+        if (view === "reports") {
+          setReportYears(years);
+          setLoadedReportKey(JSON.stringify(payload));
+        }
       }
     } catch (e) {
       if (current === sequence.current)
@@ -123,7 +163,7 @@ export default function Workspace({ view }: { view: View }) {
     } finally {
       if (current === sequence.current) setLoading(false);
     }
-  }, [filters, page, view]);
+  }, [filters, page, view, reportPayload]);
   useEffect(() => {
     reload.current = () => {
       void load();
@@ -144,6 +184,7 @@ export default function Workspace({ view }: { view: View }) {
         const data = await response.json();
         if (!active) return;
         setUsername(data.username);
+        setCanBackup(data.is_admin === true);
         client = new SocketClient(
           (state) => {
             if (active) {
@@ -292,12 +333,11 @@ export default function Workspace({ view }: { view: View }) {
       <table>
         <thead>
           <tr>
-            {view === "payments" && <th className="payment-status-cell">Đã nhận</th>}
-            <th>Đơn vị / Công việc</th>
+            {view === "payments" ? <><th>Đơn vị</th><th>Hạng mục</th></> : <th>Đơn vị / Công việc</th>}
             <th className="number">Số lượng</th>
             <th className="number">Đơn giá</th>
-            <th className="number">Thành tiền</th>
-            <th>Ngày thực hiện</th>
+            <th className="number">{view === "payments" ? "Tổng tiền" : "Thành tiền"}</th>
+            <th title={view === "payments" ? "Hạn thanh toán" : undefined}>{view === "payments" ? "Hạn TT" : "Ngày thực hiện"}</th>
             <th>Trạng thái</th>
             <th className="text-right">Thao tác</th>
           </tr>
@@ -305,9 +345,30 @@ export default function Workspace({ view }: { view: View }) {
         <tbody>
           {payments?.items.map((p) => (
             <tr key={p.id}>
-              {view === "payments" && (
-                <td className="payment-status-cell">
-                  <label className="payment-status-toggle" title={p.status === "PAID" ? "Bỏ tick để chuyển Chưa nhận" : "Tick để đánh dấu Đã nhận"}>
+              <td className="work-cell">
+                <strong>{p.organization_name}</strong>
+                {view !== "payments" && <span>{p.description}</span>}
+              </td>
+              {view === "payments" && <td>{p.description}</td>}
+              <td className="number">
+                {new Intl.NumberFormat("vi-VN", {
+                  maximumFractionDigits: 3,
+                }).format(Number(p.quantity))}
+              </td>
+              <td className="number nowrap">{money(p.unit_price)}</td>
+              <td className="number nowrap font-semibold">{money(p.amount)}</td>
+              <td className="nowrap">{view === "payments" ? (p.due_date ? day(p.due_date) : "—") : day(p.work_date)}</td>
+              <td>
+                {view === "payments" ? (
+                  <div className="flex items-center gap-1">
+                  <label
+                    className="payment-status-toggle"
+                    title={
+                      p.status === "PAID"
+                        ? "Bỏ tick để chuyển Chưa nhận"
+                        : "Tick để đánh dấu Đã nhận"
+                    }
+                  >
                     <input
                       type="checkbox"
                       className="payment-status-checkbox"
@@ -317,22 +378,9 @@ export default function Workspace({ view }: { view: View }) {
                       onChange={() => setModal({ kind: "status", record: p })}
                     />
                   </label>
-                </td>
-              )}
-              <td className="work-cell">
-                <strong>{p.organization_name}</strong>
-                <span>{p.description}</span>
-              </td>
-              <td className="number">
-                {new Intl.NumberFormat("vi-VN", {
-                  maximumFractionDigits: 3,
-                }).format(Number(p.quantity))}
-              </td>
-              <td className="number nowrap">{money(p.unit_price)}</td>
-              <td className="number nowrap font-semibold">{money(p.amount)}</td>
-              <td className="nowrap">{day(p.work_date)}</td>
-              <td>
-                <Badge status={p.status} />
+                  <Badge status={p.status} />
+                  </div>
+                ) : <Badge status={p.status} />}
               </td>
               <td>{actions(p)}</td>
             </tr>
@@ -343,37 +391,6 @@ export default function Workspace({ view }: { view: View }) {
         <Empty>
           Không có khoản phải thu phù hợp. Thêm khoản mới hoặc thay đổi bộ lọc.
         </Empty>
-      )}
-    </div>
-  );
-  const orgSummary = (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Đơn vị</th>
-            <th className="number">Số khoản</th>
-            <th className="number">Tổng phải thu</th>
-            <th className="number">Đã nhận</th>
-            <th className="number">Chưa nhận</th>
-          </tr>
-        </thead>
-        <tbody>
-          {summary?.organizations.map((o) => (
-            <tr key={o.id}>
-              <td className="work-cell">
-                <strong>{o.name}</strong>
-              </td>
-              <td className="number">{o.count}</td>
-              <td className="number nowrap">{money(o.total)}</td>
-              <td className="number nowrap">{money(o.paid)}</td>
-              <td className="number nowrap font-semibold">{money(o.unpaid)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {summary?.organizations.length === 0 && (
-        <Empty>Chưa có dữ liệu trong khoảng thời gian đã chọn.</Empty>
       )}
     </div>
   );
@@ -400,22 +417,26 @@ export default function Workspace({ view }: { view: View }) {
             </Link>
           ))}
         </nav>
-        <div className="sidebar-bottom">
-          <Button onClick={() => setModal({ kind: "backup" })}>
-            <DatabaseBackup size={17} />
-            <span>Sao lưu dữ liệu</span>
-          </Button>
-        </div>
+        {canBackup && (
+          <div className="sidebar-bottom">
+            <Button onClick={() => setModal({ kind: "backup" })}>
+              <DatabaseBackup size={17} />
+              <span>Sao lưu dữ liệu</span>
+            </Button>
+          </div>
+        )}
       </aside>
       <div className="main-shell">
         <WorkspaceHeader
           title={titles[view]}
           username={username}
+          canBackup={canBackup}
           busy={busy}
           onBackup={() => setModal({ kind: "backup" })}
           onLogout={logout}
         />
         <main className="workspace">
+          {view !== "dashboard" && (
           <div className="page-heading">
             <div>
               <p className="eyebrow">
@@ -424,7 +445,18 @@ export default function Workspace({ view }: { view: View }) {
               <h1>{titles[view]}</h1>
               <p className="muted mt-2">{descriptions[view]}</p>
             </div>
-            {view !== "reports" && (
+            {view === "reports" ? (
+              <div className="flex gap-2">
+              <Button primary disabled={loading || !summary || loadedReportKey !== reportKey}
+                onClick={() => summary && downloadReport(summary, {
+                  year: reportYear, mode: reportMode,
+                  partner: organizations.find(org => String(org.id) === reportPartner)?.name ?? "Tất cả đối tác",
+                  ...reportPayload,
+                })}>
+                <Download size={17} />Xuất báo cáo
+              </Button>
+              </div>
+            ) : (
               <div className="flex gap-2">
                 <Button
                   primary
@@ -448,6 +480,7 @@ export default function Workspace({ view }: { view: View }) {
               </div>
             )}
           </div>
+          )}
           {error && (
             <div role="alert" className="notice error">
               {error}
@@ -468,7 +501,7 @@ export default function Workspace({ view }: { view: View }) {
                 : "Kết nối bị gián đoạn. Bạn có thể xem dữ liệu đã tải; thao tác ghi tạm khóa. Hệ thống sẽ tự kết nối lại."}
             </div>
           )}
-          {view !== "organizations" && (
+          {view === "payments" && (
             <div className="filter-bar">
               <Field label="Đơn vị">
                 <select
@@ -519,113 +552,129 @@ export default function Workspace({ view }: { view: View }) {
               </Button>
             </div>
           )}
-          {loading && !payments ? (
+          {view === "dashboard" ? (
+            <Dashboard connected={connected} busy={busy} revision={dashboardRevision}
+              organizationCount={organizations.length} loadPayments={loadDashboardPayments}
+              onAddPayment={() => setModal({ kind: "payment" })}
+              onAddOrganization={() => setModal({ kind: "organization" })}
+              onDetail={record => setModal({ kind: "detail", record })} />
+          ) : loading && !payments ? (
             <div className="empty" role="status">
               Đang tải dữ liệu…
             </div>
           ) : (
             <>
-              {view !== "organizations" && summary && (
-                <div className="metrics">
-                  <div className="metric">
-                    <span>
-                      Tổng phải thu <Wallet size={18} />
-                    </span>
-                    <strong>{money(summary.totals.total)}</strong>
-                    <small>{summary.totals.count} khoản trong bộ lọc</small>
-                  </div>
-                  <div className="metric">
-                    <span>
-                      Đã nhận <ArrowDownLeft size={18} />
-                    </span>
-                    <strong>{money(summary.totals.paid)}</strong>
-                    <small>
-                      <i className="dot green" />
-                      {summary.totals.paid_count} khoản đã nhận
-                    </small>
-                  </div>
-                  <div className="metric">
-                    <span>
-                      Chưa nhận <ArrowUpRight size={18} />
-                    </span>
-                    <strong className="accent">
-                      {money(summary.totals.unpaid)}
-                    </strong>
-                    <small>
-                      <i className="dot orange" />
-                      {summary.totals.unpaid_count} khoản chưa nhận
-                    </small>
-                  </div>
-                </div>
-              )}
-              {view === "dashboard" && organizations.length === 0 && (
-                <div className="onboarding">
-                  <div>
-                    <h2>Bắt đầu với đơn vị đầu tiên</h2>
-                    <p className="muted mt-2">
-                      Thêm đơn vị hợp tác trước khi ghi nhận công việc và khoản
-                      phải thu.
-                    </p>
-                  </div>
-                  <Link className="btn btn-primary" href="/organizations">
-                    Thêm đơn vị <ArrowRight size={16} />
-                  </Link>
-                </div>
+              {view === "reports" && summary && (
+                <ReportOverview summary={summary} year={reportYear} mode={reportMode} partner={reportPartner}
+                  years={[...new Set([localReportDate().year, reportYear, ...reportYears])].sort().reverse()}
+                  organizations={organizations} start={reportPayload.start_date} end={reportPayload.end_date}
+                  onYear={setReportYear} onPartner={setReportPartner} onMode={setReportMode} />
               )}
               {view === "organizations" ? (
                 <section className="panel">
                   <div className="panel-heading">
                     <h2>
                       Danh sách đơn vị{" "}
-                      <span className="count">{organizations.length}</span>
+                      <span className="count">{filteredOrganizations.length}</span>
                     </h2>
-                    <label className="search">
+                  </div>
+                  <div className={organizationStyles.filters}>
+                    <div className="field">
+                      <label htmlFor="organization-search">Tìm kiếm</label>
+                      <div className={`search ${organizationStyles.search}`}>
                       <Search size={17} />
                       <input
+                        id="organization-search"
                         aria-label="Tìm đơn vị"
                         placeholder="Tìm tên đơn vị…"
                         value={filters.search}
                         onChange={(e) => filter("search", e.target.value)}
                       />
-                    </label>
+                      </div>
+                    </div>
+                    <Field label="Lọc loại hình">
+                      <select value={organizationType} onChange={event => setOrganizationType(event.target.value)}>
+                        <option value="">Tất cả loại hình</option>
+                        {organizationTypes.map(type => <option key={type} value={type}>{type}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Lọc trạng thái">
+                      <select value={organizationStatus} onChange={event => setOrganizationStatus(event.target.value)}>
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="ACTIVE">Đang hoạt động</option>
+                        <option value="INACTIVE">Ngừng hoạt động</option>
+                      </select>
+                    </Field>
                   </div>
                   <div className="table-wrap">
-                    <table>
+                    <table className={organizationStyles.table}>
                       <thead>
                         <tr>
-                          <th>Tên đơn vị</th>
+                          <th>Tên tổ chức</th>
+                          <th>Loại hình</th>
+                          <th>Người đại diện</th>
+                          <th>Thông tin liên hệ</th>
+                          <th>Địa chỉ</th>
                           <th>Ghi chú</th>
-                          <th>Cập nhật</th>
+                          <th>Trạng thái</th>
                           <th className="text-right">Thao tác</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {organizations
-                          .filter((o) =>
-                            o.name
-                              .toLocaleLowerCase("vi")
-                              .includes(filters.search.toLocaleLowerCase("vi")),
-                          )
-                          .map((o) => (
+                        {filteredOrganizations.map((o) => (
                             <tr key={o.id}>
-                              <td className="work-cell">
-                                <strong>{o.name}</strong>
-                                <span>Đơn vị #{o.id}</span>
+                              <td>
+                                <strong className={organizationStyles.name}>
+                                  {o.name}
+                                </strong>
+                                <span className={organizationStyles.identifier}>
+                                  Đơn vị #{o.id}
+                                </span>
                               </td>
-                              <td className="notes-cell">{o.notes || "—"}</td>
-                              <td className="nowrap muted">
-                                {timestamp(o.updated_at)}
+                              <td className={organizationStyles.content}>
+                                {o.organization_type || "—"}
+                              </td>
+                              <td className={organizationStyles.content}>
+                                {o.representative || "—"}
+                              </td>
+                              <td>
+                                <div className={organizationStyles.contact}>
+                                  {o.contact_email && (
+                                    <a href={`mailto:${o.contact_email}`}>
+                                      <Mail size={13} aria-hidden="true" />
+                                      <span>{o.contact_email}</span>
+                                    </a>
+                                  )}
+                                  {o.contact_phone && (
+                                    <a
+                                      href={`tel:${o.contact_phone.replace(/[^\d+]/g, "")}`}
+                                    >
+                                      <Phone size={13} aria-hidden="true" />
+                                      <span>{o.contact_phone}</span>
+                                    </a>
+                                  )}
+                                  {!o.contact_email && !o.contact_phone && "—"}
+                                </div>
+                              </td>
+                              <td className={organizationStyles.content}>
+                                {o.address || "—"}
+                              </td>
+                              <td className={organizationStyles.content}>
+                                {o.notes || "—"}
+                              </td>
+                              <td>
+                                <span
+                                  className={`badge ${o.status === "INACTIVE" ? organizationStyles.inactive : "paid"}`}
+                                >
+                                  {organizationStatusLabel(o.status)}
+                                </span>
                               </td>
                               <td>{actions(o)}</td>
                             </tr>
                           ))}
                       </tbody>
                     </table>
-                    {organizations.filter((o) =>
-                      o.name
-                        .toLocaleLowerCase("vi")
-                        .includes(filters.search.toLocaleLowerCase("vi")),
-                    ).length === 0 && (
+                    {filteredOrganizations.length === 0 && (
                       <Empty>
                         Chưa có đơn vị phù hợp. Chọn “Thêm đơn vị” để tạo mới.
                       </Empty>
@@ -634,71 +683,20 @@ export default function Workspace({ view }: { view: View }) {
                 </section>
               ) : view === "reports" ? (
                 <>
-                  <section className="panel">
-                    <div className="panel-heading">
-                      <h2>Đối chiếu theo đơn vị</h2>
-                      <span className="muted text-xs">
-                        Theo ngày thực hiện công việc
-                      </span>
-                    </div>
-                    {orgSummary}
-                  </section>
-                  <section className="panel mt-6">
-                    <div className="panel-heading">
-                      <h2>Đối chiếu theo tháng</h2>
-                    </div>
-                    <div className="table-wrap">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Tháng</th>
-                            <th className="number">Số khoản</th>
-                            <th className="number">Đã nhận / Chưa nhận</th>
-                            <th className="number">Tổng phải thu</th>
-                            <th className="number">Đã nhận</th>
-                            <th className="number">Chưa nhận</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {summary?.periods.map((p) => (
-                            <tr key={p.period}>
-                              <td>{p.period.split("-").reverse().join("/")}</td>
-                              <td className="number">{p.count}</td>
-                              <td className="number">
-                                {p.paid_count} / {p.unpaid_count}
-                              </td>
-                              <td className="number nowrap">
-                                {money(p.total)}
-                              </td>
-                              <td className="number nowrap">{money(p.paid)}</td>
-                              <td className="number nowrap">
-                                {money(p.unpaid)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {summary?.periods.length === 0 && (
-                        <Empty>Chưa có dữ liệu để đối chiếu.</Empty>
-                      )}
-                    </div>
-                  </section>
+                  {summary && (
+                    <ReportCharts summary={summary} loading={loading}
+                      grouping={reportMode === "quarter" ? "quarter" : "month"}
+                      onGroupingChange={value => setReportMode(value === "quarter" ? "quarter" : reportMode === "quarter" ? "year" : reportMode)} />
+                  )}
                 </>
               ) : (
                 <>
                   <section className="panel">
                     <div className="panel-heading">
                       <h2>
-                        {view === "dashboard"
-                          ? "Khoản phải thu gần đây"
-                          : "Danh sách khoản phải thu"}{" "}
+                        Danh sách khoản phải thu{" "}
                         <span className="count">{payments?.total || 0}</span>
                       </h2>
-                      {view === "dashboard" ? (
-                        <Link href="/payments" className="text-link">
-                          Xem tất cả <ArrowRight size={15} />
-                        </Link>
-                      ) : (
                         <label className="search">
                           <Search size={17} />
                           <input
@@ -709,7 +707,6 @@ export default function Workspace({ view }: { view: View }) {
                             onChange={(e) => filter("search", e.target.value)}
                           />
                         </label>
-                      )}
                     </div>
                     {paymentTable}
                     {view === "payments" && (
@@ -739,17 +736,6 @@ export default function Workspace({ view }: { view: View }) {
                       </div>
                     )}
                   </section>
-                  {view === "dashboard" && (
-                    <section className="panel mt-6">
-                      <div className="panel-heading">
-                        <h2>Tổng hợp theo đơn vị</h2>
-                        <Link href="/reports" className="text-link">
-                          Báo cáo chi tiết <ArrowRight size={15} />
-                        </Link>
-                      </div>
-                      {orgSummary}
-                    </section>
-                  )}
                 </>
               )}
               <p className="footnote">
@@ -848,14 +834,21 @@ export default function Workspace({ view }: { view: View }) {
                   ["Đơn giá", money(modal.record.unit_price)],
                   ["Thành tiền", money(modal.record.amount)],
                   ["Ngày thực hiện", day(modal.record.work_date)],
+                  ["Hạn TT", modal.record.due_date ? day(modal.record.due_date) : "—"],
                   [
                     "Trạng thái",
                     modal.record.status === "PAID" ? "Đã nhận" : "Chưa nhận",
                   ],
                 ]
               : [
-                  ["Tên đơn vị", modal.record.name],
+                  ["Tên tổ chức", modal.record.name],
+                  ["Loại hình", modal.record.organization_type || "—"],
+                  ["Người đại diện", modal.record.representative || "—"],
+                  ["Email", modal.record.contact_email || "—"],
+                  ["Số điện thoại", modal.record.contact_phone || "—"],
+                  ["Địa chỉ", modal.record.address || "—"],
                   ["Ghi chú", modal.record.notes || "—"],
+                  ["Trạng thái", organizationStatusLabel(modal.record.status)],
                 ]
             )
               .concat([

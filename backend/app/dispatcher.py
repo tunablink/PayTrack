@@ -28,18 +28,19 @@ class Dispatcher:
                 raise DomainError('IDEMPOTENCY_REQUIRED', 'Thao tác ghi cần khóa chống trùng riêng.')
             with self.repository.connect() as conn:
                 conn.execute('BEGIN IMMEDIATE' if action.write else 'BEGIN')
-                if not authenticated(conn, token):
+                user = authenticated(conn, token)
+                if not user:
                     raise DomainError('UNAUTHORIZED', 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')
                 fingerprint = hashlib.sha256(json.dumps({'action':message.action,'payload':message.payload}, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
                 if action.write:
-                    cached = conn.execute('SELECT * FROM idempotency WHERE key=?', (message.idempotencyKey,)).fetchone()
+                    cached = conn.execute('SELECT * FROM idempotency WHERE key=? AND user_id=?', (message.idempotencyKey,user['id'])).fetchone()
                     if cached:
                         if cached['fingerprint'] != fingerprint:
                             raise DomainError('IDEMPOTENCY_CONFLICT', 'Khóa chống trùng đã dùng cho nội dung khác.')
                         return {'requestId':message.requestId, 'success':True, 'data':json.loads(cached['result'])}
-                data = action.handler(SimpleNamespace(conn=conn, executor=self.executor), payload)
+                data = action.handler(SimpleNamespace(conn=conn, executor=self.executor,user_id=user['id'],is_admin=bool(user['is_admin'])), payload)
                 if action.write:
-                    conn.execute('INSERT INTO idempotency VALUES (?,?,?,?)', (message.idempotencyKey, fingerprint,json.dumps(data),int(time.time())))
+                    conn.execute('INSERT INTO idempotency(key,fingerprint,result,created_at,user_id) VALUES (?,?,?,?,?)', (message.idempotencyKey, fingerprint,json.dumps(data),int(time.time()),user['id']))
                 conn.commit()
             return {'requestId':message.requestId, 'success':True, 'data':data}
         except ValidationError:

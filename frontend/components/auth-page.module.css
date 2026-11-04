@@ -1,0 +1,48 @@
+.page {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 96px 28px;
+  background: #fff;
+}
+.brand {
+  position: absolute;
+  top: 30px;
+  left: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 25px;
+  font-weight: 700;
+  letter-spacing: -.7px;
+  color: var(--ink);
+}
+.brand > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  background: var(--accent);
+  color: white;
+}
+.panel { width: min(100%, 500px); }
+.panel h1 { font-size: 34px; line-height: 1.3; margin: 0 0 10px; letter-spacing: -.8px; }
+.panel > p { font-size: 14px; margin: 0 0 28px; }
+.panel form { gap: 22px; }
+.panel label { font-size: 14px; }
+.panel input { min-height: 54px; padding: 13px 15px; font-size: 16px; border-radius: 8px; }
+.panel form > button, .panel > div > a:global(.btn) { min-height: 52px; font-size: 15px; border-radius: 8px; }
+.panel form > button svg { width: 19px; height: 19px; }
+.panel > div > p { font-size: 13px; }
+.panel > div > a { font-size: 14px; }
+@media(max-width: 640px) {
+  .page { padding: 100px 24px 48px; }
+  .brand { top: 24px; left: 24px; font-size: 23px; }
+  .brand > span { width: 40px; height: 40px; }
+  .panel h1 { font-size: 30px; }
+  .panel > p { font-size: 13px; margin-bottom: 24px; }
+  .panel form { gap: 20px; }
+}

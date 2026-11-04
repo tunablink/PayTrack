@@ -47,7 +47,7 @@ The system provides a lightweight browser-based tool for tracking work-related r
 
 ### 2.3. Scope
 
-**In scope (planned):** Single-person use; organization CRUD; receivable CRUD; paid/unpaid status; searching/filtering; dashboard summaries; reporting; browser-to-server WebSocket communication; SQLite persistence; network error handling; VPS deployment.
+**In scope:** Multiple accounts with isolated personal data; organization CRUD; receivable CRUD; paid/unpaid status; searching/filtering; dashboard summaries; reporting; browser-to-server WebSocket communication; SQLite persistence; network error handling; VPS deployment.
 
 **Out of scope (initial release):** Bank integration, automatic transfers, payroll/tax accounting, AI forecasting, complex multi-user roles and advanced accounting. Partial payments, import/export and authentication beyond a minimal secure deployment are possible follow-ups, subject to project requirements.
 
@@ -108,12 +108,16 @@ Connect the browser to the Python backend using WebSocket; show connection state
 
 | Page / view | Features |
 | --- | --- |
+| **Login** (`/login`) | Sign in to an account; the registration link remains available |
+| **Registration** (`/register`) | Create additional accounts with distinct usernames, passwords of at least 12 characters and matching password confirmation; each account has its own organizations and receivables |
 | **Dashboard** (`/dashboard`) | Total expected, total paid, total unpaid; paid/unpaid record counts; high-level summaries by organization or period |
 | **Organizations** (`/organizations`) | Organization list; add/edit/delete organizations; organization name and optional notes |
 | **Receivables / Payment Management** (`/payments`) | Receivable list; create/edit/delete; organization, description, quantity, unit price, computed amount, work date; mark PAID/UNPAID; search/filter by organization, status and period |
 | **Reports / Statistics** (`/reports`) | Breakdown by organization and time period; paid/unpaid counts and totals; charts/tables as presentation choices |
 
-**Shared interface elements, not necessarily separate pages:** connection status/error notifications, create/edit dialogs and form validation. A dedicated Settings, Login or Import/Export page is **not** specified as a core page in the original requirements. The routes above are proposed names, not implemented routes.
+**Shared interface elements, not necessarily separate pages:** connection status/error notifications, create/edit dialogs and form validation. Settings and Import/Export remain outside the core page scope.
+
+**Multiple-account update (4 November 2026):** A person can register multiple accounts using distinct usernames. After registration, sign in at `/login`. Data, totals and idempotency keys are scoped to the authenticated account. Migration 002 preserves the existing account, data and valid sessions, and creates a private backup before upgrading an existing database. The initial account retains administrator access to whole-system backups; additional accounts can access only their own business data. See `docs/OPERATIONS.md` for upgrade instructions.
 
 ## 4. System Architecture
 

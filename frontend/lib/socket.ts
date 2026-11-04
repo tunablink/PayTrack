@@ -16,6 +16,8 @@ export class SocketClient {
   attempts = 0;
   retry: ReturnType<typeof setTimeout> | undefined;
   heartbeat: ReturnType<typeof setInterval> | undefined;
+  private connecting = false;
+  private ticketController: AbortController | undefined;
   private failPending() {
     for (const entry of this.pending.values()) {
       clearTimeout(entry.timer);
@@ -30,6 +32,9 @@ export class SocketClient {
     this.pending.clear();
   }
   private offline = () => {
+    this.ticketController?.abort();
+    this.ticketController = undefined;
+    this.connecting = false;
     clearTimeout(this.retry);
     clearInterval(this.heartbeat);
     this.failPending();
@@ -57,15 +62,48 @@ export class SocketClient {
   }
   connect() {
     if (this.stopped) return;
+    if (this.connecting) return;
     if (!navigator.onLine) {
       this.change("disconnected");
       return;
     }
     this.change("connecting");
+    if (process.env.NEXT_PUBLIC_WS_TICKET_AUTH === "true") {
+      this.connecting = true;
+      this.ticketController = new AbortController();
+      const controller = this.ticketController;
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      void fetch("/api/auth/ws-ticket", { method: "POST", cache: "no-store", signal: controller.signal })
+        .then(async response => {
+          if (this.stopped || controller.signal.aborted || this.ticketController !== controller) return;
+          if (response.status === 401) {
+            this.stopped = true;
+            this.change("expired");
+            return;
+          }
+          if (!response.ok) throw new Error("Cannot get WebSocket ticket");
+          const data = await response.json();
+          if (typeof data.ticket !== "string" || !data.ticket) throw new Error("Invalid WebSocket ticket");
+          if (!this.stopped && !controller.signal.aborted && this.ticketController === controller) this.open(["paytrack", `ticket.${data.ticket}`]);
+        })
+        .catch(() => {
+          if (this.stopped || this.ticketController !== controller) return;
+          this.change("disconnected");
+          if (navigator.onLine) this.retry = setTimeout(() => this.connect(), Math.min(30000, 1000 * 2 ** Math.min(this.attempts++, 5)));
+        })
+        .finally(() => {
+          clearTimeout(timeout);
+          if (this.ticketController === controller) { this.connecting = false; this.ticketController = undefined; }
+        });
+      return;
+    }
+    this.open();
+  }
+  private open(protocols?: string[]) {
     const url =
       process.env.NEXT_PUBLIC_WS_URL ||
       `${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname}:8000/ws`;
-    const socket = new WebSocket(url);
+    const socket = new WebSocket(url, protocols);
     this.socket = socket;
     socket.onopen = () => {
       if (this.socket !== socket || this.stopped) {
@@ -161,6 +199,7 @@ export class SocketClient {
   }
   close() {
     this.stopped = true;
+    this.ticketController?.abort();
     window.removeEventListener("offline", this.offline);
     window.removeEventListener("online", this.online);
     clearTimeout(this.retry);

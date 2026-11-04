@@ -11,6 +11,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('command',choices=['setup','backup','restore','seed'])
     parser.add_argument('--file')
+    parser.add_argument('--username')
     parser.add_argument('--confirm-empty-demo',action='store_true')
     args = parser.parse_args()
     repo = Repository(Settings().db)
@@ -41,11 +42,12 @@ def main():
         if password != getpass.getpass('Confirm password: '):
             raise SystemExit('Passwords differ')
         with repo.connect() as conn:
-            if conn.execute('SELECT 1 FROM owner').fetchone():
-                raise SystemExit('Owner already exists; no changes made')
-            conn.execute('INSERT INTO owner VALUES (1,?,?)',(username,hasher.hash(password)))
+            conn.execute('BEGIN IMMEDIATE')
+            if conn.execute('SELECT 1 FROM users').fetchone():
+                raise SystemExit('Administrator already exists; register additional accounts through /register')
+            conn.execute('INSERT INTO users(username,password_hash,is_admin) VALUES (?,?,1)',(username,hasher.hash(password)))
             conn.commit()
-        print('Owner created.')
+        print('Administrator created.')
     elif args.command == 'backup':
         if not args.file:
             parser.error('backup requires --file')
@@ -60,10 +62,14 @@ def main():
         if not args.confirm_empty_demo:
             raise SystemExit('Use --confirm-empty-demo on a demo database only')
         with repo.connect() as conn:
+            accounts = conn.execute('SELECT id,username FROM users').fetchall()
+            selected = next((r for r in accounts if r['username']==args.username),None) if args.username else (accounts[0] if len(accounts)==1 else None)
+            if selected is None:
+                raise SystemExit('Create an account first; when multiple accounts exist, supply --username for demo data')
             if conn.execute('SELECT 1 FROM organizations').fetchone():
                 raise SystemExit('Database must contain no organizations')
-            conn.execute("INSERT INTO organizations(id,name,notes) VALUES (1,'Đơn vị mẫu A','DỮ LIỆU DEMO'),(2,'Đơn vị mẫu B','DỮ LIỆU DEMO')")
-            conn.execute("INSERT INTO payments(organization_id,description,quantity,unit_price,amount,work_date,status) VALUES (1,'Giảng dạy (DEMO)','20',200000,4000000,'2026-11-01','UNPAID'),(2,'Chấm thi (DEMO)','50',30000,1500000,'2026-11-02','PAID')")
+            conn.execute("INSERT INTO organizations(id,name,notes,user_id) VALUES (1,'Đơn vị mẫu A','DỮ LIỆU DEMO',?),(2,'Đơn vị mẫu B','DỮ LIỆU DEMO',?)",(selected['id'],selected['id']))
+            conn.execute("INSERT INTO payments(organization_id,description,quantity,unit_price,amount,work_date,status,user_id) VALUES (1,'Giảng dạy (DEMO)','20',200000,4000000,'2026-11-01','UNPAID',?),(2,'Chấm thi (DEMO)','50',30000,1500000,'2026-11-02','PAID',?)",(selected['id'],selected['id']))
             conn.commit()
         print('Demo data created explicitly.')
 
