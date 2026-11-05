@@ -1,569 +1,380 @@
-# Personal Payment Tracking System — Next.js, Python and VPS
+# PayTrack — Personal Payment Tracking System
 
-> **Project status:** Planning and design. This document describes the revised proposed architecture, not completed or tested functionality.
->
-> **Infrastructure clarification:** Use a **VPS (Virtual Private Server) / cloud virtual server with administrator control**, not shared hosting and not ESP32. The provider and server size remain to be selected.
+## 1. Team Information
 
-## 1. Project Information
-
-| Information | Description |
+| Item | Details |
 | --- | --- |
-| Project Name | Personal Payment Tracking System |
+| Project title | Personal Payment Tracking System |
 | Group | 12 |
-| Course | Java Software Development (original course designation; confirm approval of non-Java stack) |
-| Academic Year | 2026–2027 |
-| Instructor | Ngô Văn Quyền|
-| Members | 2301040089 Ngô Thị Thanh Hương 2301040012 Tống Phương Anh 2301040102 Nguyễn Thị Thuỳ Linh 2301040206 Lê Thị Hải Yến 2301040208 Nguyễn Thị Hoàng Yến |
-| Project Direction | Web application: Next.js + Tailwind CSS frontend; Python backend; socket-based networking; VPS deployment |
-| Current Stage | Requirements analysis and architecture planning |
+| Course | Java Software Development |
+| Academic year | 2026–2027 |
+| Instructor | Ngô Văn Quyền |
+| Technology stack | Next.js, Python/FastAPI, WebSocket, SQLite |
 
-### Proposed Team Responsibilities
-
-| Role | Main Responsibility |
-| --- | --- |
-| 2301040208 Nguyễn Thị Hoàng Yến | Requirements, documentation and testing |
-| 2301040012 Tống Phương Anh | Next.js pages, Tailwind styling and client state |
-| 2301040089 Ngô Thị Thanh Hương | Python services, validation and business rules |
-| 2301040206 Lê Thị Hải Yến | Socket networking, multithreading and metaprogramming |
-| 2301040102 Nguyễn Thị Thuỳ Linh | SQLite, VPS deployment, integration and testing |
-
-## 2. Project Overview
-
-### 2.1. Problem and Motivation
-
-An individual may work for several organizations (for example, a lecturer teaching, marking examinations or supervising students at different universities). Each organization owes different amounts for different activities. Informal tracking makes it difficult to determine what work is complete, how much money is expected, what has been paid and what remains outstanding.
-
-The system provides a lightweight browser-based tool for tracking work-related receivables rather than a full accounting platform. The revised implementation also demonstrates Python networking, concurrency and metaprogramming in a practical client–server system.
-
-### 2.2. Objectives
-
-1. Maintain organizations that owe the user money.
-2. Record work descriptions, quantities, unit prices, dates and calculated amounts.
-3. Mark receivables as **PAID** or **UNPAID**.
-4. Display totals, filtering and summaries by organization or period.
-5. Build the web frontend with **Next.js, TypeScript and Tailwind CSS**.
-6. Build the backend with **Python and FastAPI**, using **WebSocket (a socket-based, TCP-backed protocol)** for application messages.
-7. Deploy the application and database on a **VPS** and demonstrate meaningful **Networking, Multithreading and Metaprogramming**.
-
-### 2.3. Scope
-
-**In scope:** Multiple accounts with isolated personal data; organization CRUD; receivable CRUD; paid/unpaid status; searching/filtering; dashboard summaries; reporting; browser-to-server WebSocket communication; SQLite persistence; network error handling; VPS deployment.
-
-**Out of scope (initial release):** Bank integration, automatic transfers, payroll/tax accounting, AI forecasting, complex multi-user roles and advanced accounting. Partial payments, import/export and authentication beyond a minimal secure deployment are possible follow-ups, subject to project requirements.
-
-### 2.4. Functional Requirements
-
-| ID | Requirement | Priority |
+| Student ID | Full name | Responsibilities |
 | --- | --- | --- |
-| FR-01 | Create, view, edit and delete organizations | Must |
-| FR-02 | Create, view, edit and delete receivables | Must |
-| FR-03 | Record organization, work description, quantity, unit price, amount and relevant dates | Must |
-| FR-04 | Change status between PAID and UNPAID | Must |
-| FR-05 | Show total expected, total paid and total unpaid | Must |
-| FR-06 | Filter records by organization, status and period | Should |
-| FR-07 | Exchange structured messages over a WebSocket connection | Must |
-| FR-08 | Show meaningful validation, disconnection and server errors | Must |
-| FR-09 | Import/export or backup data | Could |
+| 2301040089 | Ngô Thị Thanh Hương | Python backend, data validation, and business logic |
+| 2301040012 | Tống Phương Anh | Next.js frontend, interface, and client state |
+| 2301040102 | Nguyễn Thị Thuỳ Linh | SQLite, deployment, integration, and testing |
+| 2301040206 | Lê Thị Hải Yến | Socket networking, multithreading, and metaprogramming |
+| 2301040208 | Nguyễn Thị Hoàng Yến | Requirements, documentation, and testing |
 
-### 2.5. Non-Functional Requirements
+## 2. Current Features and Interface
 
-- **Usability:** Responsive browser pages with clear forms, tables and payment indicators.
-- **Responsiveness:** Keep slow I/O and background work from blocking requests or the browser.
-- **Correctness:** Reject invalid quantities/prices; use integer VND or Decimal for money.
-- **Reliability:** Handle socket disconnections, retries and failed updates without false success.
-- **Maintainability:** Separate presentation, business logic, transport and persistence.
-- **Security:** Use HTTPS/WSS, validate all messages, protect the database and require appropriate authentication before public access.
-- **Portability:** Document Python/Node versions, container configuration and VPS setup.
+The interface uses the **Inter** font, an orange primary color, and neutral backgrounds, with desktop and mobile layouts. The header displays an initials avatar, the account name, and a logout button. Business data refreshes automatically every 15 seconds and after reconnection; the pages have no Refresh button.
 
-## 3. Main Features
+### Login and Registration
 
-### 3.1. Organization Management
+- `/login`: username and password.
+- `/register`: username, password, and password confirmation; passwords must contain at least 12 characters.
+- Multiple accounts can be created with distinct usernames; registration remains open after the first account is created.
+- Duplicate usernames and mismatched password confirmations produce errors. Successful registration directs the user to log in.
+- Both pages have a white background, the PayTrack logo/name in the upper-left corner, a centered form, 54px-high inputs, and 16px input text.
+- Passwords are hashed with Argon2. Sessions use HttpOnly cookies; HTTPS production deployments enable the Secure cookie attribute.
+- The first account administers whole-system backups. This permission does not grant access to another account's business data.
 
-Manage organizations such as universities or companies, including ID, name and optional notes; support add, list, edit and delete operations.
+### Dashboard — `/dashboard`
 
-### 3.2. Receivable Management
+The page contains the following sections:
 
-Record organization, work description, quantity, unit price, calculated amount, work date and PAID/UNPAID status. Support create/read/update/delete, input validation, search and filters.
+1. Total receivables, collection progress, an add-payment action, and report export.
+2. Cash flow status: received payments, outstanding receivables, and the overdue portion.
+3. Quick actions and reminders: view a payment requiring collection, add a payment, and add an organization.
+4. Recent payments: All / Unpaid / Paid filters, pagination, and detail views.
+5. Receipt history: paid records ordered by their most recent update.
+6. Revenue share by partner.
 
-**Illustrative example (not actual project data):**
+The current month is selected by default; Week / Month / Quarter controls update all sections together. The reconciliation-period selector, work-date range caption, and long subtitle have been removed. An unpaid payment is overdue when its payment due date has passed.
 
-| Organization | Work | Quantity | Unit Price | Amount | Status |
-| --- | --- | ---: | ---: | ---: | --- |
-| University A | Teaching | 20 | 200,000 VND | 4,000,000 VND | PAID |
-| University B | Exam marking | 50 | 30,000 VND | 1,500,000 VND | UNPAID |
-| University C | Supervision | 5 | 500,000 VND | 2,500,000 VND | PAID |
-| University A | Invigilation | 4 | 300,000 VND | 1,200,000 VND | UNPAID |
+Receipt history currently uses record update timestamps. It is not a bank transaction ledger or a separate record of actual receipt dates.
 
-For this example only: **Total 9,200,000 VND; paid 6,500,000 VND; unpaid 2,700,000 VND.**
+### Organizations — `/organizations`
 
-### 3.3. Dashboard and Reporting
+Columns appear in the following order:
 
-Display aggregate expected/paid/unpaid totals, counts of paid/unpaid records and breakdowns by organization or time period. These are receivable statistics, not bank-account balances.
+**Organization Name → Type → Representative → Contact Information → Address → Notes → Status → Actions.**
 
-### 3.4. Networking and Connection Status
+- Create, view, edit, and delete organizations; store their type, representative, email, phone number, address, and notes.
+- Status values are **Active** (`ACTIVE`) and **Inactive** (`INACTIVE`).
+- Filters include name search, organization type drawn from existing records, and status. Criteria can be combined, and the search field is the widest control.
+- Email addresses and phone numbers use `mailto:`/`tel:` links. Organizations with linked payments cannot be deleted.
 
-Connect the browser to the Python backend using WebSocket; show connection state, loading/processing state, server-side validation errors and reconnect feedback.
+### Payment Management — `/payments`
 
-### 3.5. Proposed Page Structure (derived from the feature scope)
+Columns appear in the following order:
 
-| Page / view | Features |
-| --- | --- |
-| **Login** (`/login`) | Sign in to an account; the registration link remains available |
-| **Registration** (`/register`) | Create additional accounts with distinct usernames, passwords of at least 12 characters and matching password confirmation; each account has its own organizations and receivables |
-| **Dashboard** (`/dashboard`) | Total expected, total paid, total unpaid; paid/unpaid record counts; high-level summaries by organization or period |
-| **Organizations** (`/organizations`) | Organization list; add/edit/delete organizations; organization name and optional notes |
-| **Receivables / Payment Management** (`/payments`) | Receivable list; create/edit/delete; organization, description, quantity, unit price, computed amount, work date; mark PAID/UNPAID; search/filter by organization, status and period |
-| **Reports / Statistics** (`/reports`) | Breakdown by organization and time period; paid/unpaid counts and totals; charts/tables as presentation choices |
+**Organization → Item → Quantity → Unit Price → Total Amount → Payment Due → Status → Actions.**
 
-**Shared interface elements, not necessarily separate pages:** connection status/error notifications, create/edit dialogs and form validation. Settings and Import/Export remain outside the core page scope.
+- Create, view, edit, and delete payments; search items and filter by organization, status, and work-date range.
+- The backend calculates amounts with `Decimal` and rounds to the nearest dong; VND amounts are stored as integers.
+- **Payment Due** (`due_date`) is independent of the work date (`work_date`). It can be entered, edited, or cleared; a missing due date is displayed as `—`.
+- The paid checkbox is located in the Status column. Status changes require confirmation and are displayed after the backend responds.
+- Stored payment statuses are `PAID` / `UNPAID`. The dashboard's overdue label is derived from an unpaid status and the payment due date.
+- The page no longer displays the three Total Receivables / Received / Outstanding summary cards at the top.
 
-**Multiple-account update (4 November 2026):** A person can register multiple accounts using distinct usernames. After registration, sign in at `/login`. Data, totals and idempotency keys are scoped to the authenticated account. Migration 002 preserves the existing account, data and valid sessions, and creates a private backup before upgrading an existing database. The initial account retains administrator access to whole-system backups; additional accounts can access only their own business data. See `docs/OPERATIONS.md` for upgrade instructions.
+### Reports — `/reports`
 
-## 4. System Architecture
+- Four metrics: **Total Contract Revenue**, **Total Payments Received**, **Outstanding Balance**, and **Receivables Collection Rate**.
+- Collection rate = received amount / total value × 100%; a zero total displays 0%.
+- Filters below the metrics: **Year**, **Partner**, and **Last 6 Months / By Quarter / Full Year**.
+- Full Year and By Quarter use the selected year; By Quarter groups chart data into quarters. Last 6 Months covers six months through today for the current year, or July–December when another year is selected.
+- Filters update **Cash Flow Trends**, **Status Distribution**, and **Outstanding Receivables by Organization** together.
+- The organization/month reconciliation tables and the previous organization / status / start-date / end-date / reset controls have been removed.
+- The **Export Report** button in the upper-right corner downloads data matching the current filters.
 
-### 4.1. Proposed Architecture
+Dashboard and report exports produce **UTF-8 CSV files with a BOM that can be opened in Excel**; `.xlsx` and PDF exports are not implemented. Statistics use work dates. “Contract revenue” labels the total value of payment records; a separate contract-management module is not implemented.
+
+## 3. Architecture and Technical Implementation
 
 ```text
 Browser
-  Next.js + TypeScript + Tailwind CSS
-  Pages / Forms / Charts / WebSocket Client
-                 |
-                 | WSS (WebSocket over TLS, TCP/IP)
-                 v
-VPS / Cloud Virtual Server (Linux)
-  Reverse Proxy (Nginx or Caddy: TLS and WebSocket upgrade)
-                 |
-                 v
-  Python FastAPI / ASGI application
-    WebSocket endpoint and JSON message dispatcher
-    Validation / Services / Reporting
-    ThreadPoolExecutor for selected blocking I/O tasks
-    Decorator-based authorization / logging
-    Reflection-based handler registry
-                 |
-                 v
-  SQLite (persistent storage)
+  ├─ HTTPS → Next.js frontend on Vercel
+  │              └─ /api/* → FastAPI on Render
+  └─ WSS + one-time connection ticket → /ws on Render
+                                           ├─ Pydantic validation
+                                           ├─ Dispatcher + action registry
+                                           ├─ Services + SQLite transactions
+                                           └─ SQLite on Persistent Disk
 ```
 
-**Deployment model:** The VPS runs the server processes; it is not the user's development PC. Docker Compose runs frontend, backend and reverse-proxy services on the VPS. SQLite is an embedded database accessed only by the backend; no separate database server or container is required. Mount the entire SQLite data directory as a persistent volume. A VPS gives control over processes and ports, unlike typical shared hosting.
-
-**Socket terminology:** For a browser frontend, use **WebSocket**, which provides persistent bidirectional socket-based communication over TCP. A browser cannot directly open an arbitrary raw TCP socket. If the instructor specifically requires a raw TCP socket (`socket.socket`), confirm whether a separate Python-to-Python TCP demonstration/service is required; do not label WebSocket as raw TCP.
-
-### 4.2. Responsibilities
-
-| Component | Responsibilities |
+| Component | Implementation |
 | --- | --- |
-| Next.js pages/components | Render pages, forms, tables and charts; display server-confirmed state |
-| WebSocket client | Establish WSS connection, send messages with request IDs, receive responses, reconnect safely |
-| FastAPI WebSocket endpoint | Accept connections, parse messages, dispatch actions, return structured responses |
-| Python services | Validation, monetary calculations, organization/payment operations and reporting |
-| Thread pool / workers | Run selected blocking tasks without blocking the async event loop; handle safe concurrent work |
-| Decorators / reflection registry | Cross-cutting logging/authorization/validation and dynamic dispatch of action handlers |
-| SQLite repository | Store and query organizations and receivables using parameterized access / ORM |
-| Reverse proxy + VPS | TLS termination, routing, deployment and server process management |
+| Networking | Bidirectional WebSocket JSON over TCP/IP, request IDs, a 15-second heartbeat, timeouts, and automatic reconnection |
+| Multithreading | `run_in_threadpool` for synchronous processing; a bounded `ThreadPoolExecutor` for backups; locks protecting job state and connection tickets |
+| Metaprogramming | The `@registry.action(...)` decorator, handler validation with `inspect.signature`, execution-time wrappers, and dispatch through an allowlisted action registry |
+| Consistency | Transactions, record versions to prevent conflicting updates, and idempotency keys for writes |
+| Authorization | Server-side session and `user_id` checks; foreign keys preventing cross-account data links |
 
-### 4.3. Example Request Flow
+WebSocket is a browser-compatible socket protocol running over TCP/IP, rather than the raw TCP `socket.socket` API. Async I/O and multithreading are separate mechanisms in this project.
 
-1. The user selects **Mark as paid** on the Receivables page.
-2. Next.js sends a WebSocket JSON message containing `requestId`, action and payment ID.
-3. FastAPI validates the message and dispatches it to the corresponding Python service.
-4. The service updates SQLite safely and returns the committed result.
-5. The server sends a response with the matching `requestId`.
-6. The browser updates the displayed status and dashboard data only after confirmed success; otherwise it shows an error.
+### Authentication Across Vercel and Render Hostnames
 
-### 4.4. Preliminary WebSocket Message Contract
+1. The frontend proxies HTTP `/api/*` requests to Render; the HttpOnly cookie belongs to the frontend hostname.
+2. When ticket authentication is enabled, the client calls `POST /api/auth/ws-ticket` with its existing session.
+3. The backend issues a one-time ticket that expires after 30 seconds. The client sends it to Render through a WebSocket subprotocol.
+4. The backend validates the Origin, ticket, and session before accepting the connection, then checks the session on every action.
+5. Reconnection obtains a fresh ticket; logout revokes the session and the open socket's authorization.
 
-**Proposed endpoint:** `wss://<your-domain>/ws` (placeholder; not a deployed address).
+Third-party cookies and wildcard CORS are not required. Local or same-origin Docker deployments can continue using cookie-based WebSocket authentication when ticket authentication is disabled.
 
-**Client request example:**
+### WebSocket Message Contract
+
+Example payment status update:
 
 ```json
 {
   "requestId": "req-104",
   "action": "payment.updateStatus",
-  "payload": { "paymentId": 12, "status": "PAID" }
+  "payload": { "id": 12, "version": 1, "status": "PAID" },
+  "idempotencyKey": "unique-key-for-this-write"
 }
 ```
 
-**Server success response example:**
+Responses include the same `requestId`, `success`, and either `data` or an `error` containing `code` and `message`. Write actions require an `idempotencyKey`; updates and deletions require the appropriate record version.
 
-```json
-{
-  "requestId": "req-104",
-  "success": true,
-  "data": { "paymentId": 12, "status": "PAID" }
-}
-```
+Action groups: `organization.list/create/update/delete`, `payment.list/create/update/delete/updateStatus`, `dashboard.summary`, `report.summary`, `report.years`, `system.ping`, and `backup.start/status`.
 
-**Server error response example:**
+## 4. SQLite Database
 
-```json
-{
-  "requestId": "req-104",
-  "success": false,
-  "error": { "code": "VALIDATION_ERROR", "message": "Invalid payment status" }
-}
-```
-
-**Planned action groups:** `organization.list/create/update/delete`, `payment.list/create/update/delete/updateStatus`, `dashboard.summary`, `report.byOrganization`, `report.byPeriod`, `system.ping`.
-
-Message validation, authorization, correlation IDs, timeout policy, duplicate-write prevention and database transactions must be implemented and tested. This is a proposed protocol, not a running endpoint.
-
-## 5. Python Application Design
-
-### 5.1. Proposed Modules
-
-| Module / class | Responsibility |
+| Environment | Location |
 | --- | --- |
-| `main.py` | FastAPI application and startup configuration |
-| `ws_endpoint.py` | WebSocket lifecycle, connection handling |
-| `message_dispatcher.py` | Route validated actions to registered handlers |
-| `models.py` / `schemas.py` | Database models and Pydantic request/response schemas |
-| `payment_service.py` | Payment validation, calculation and status updates |
-| `organization_service.py` | Organization operations |
-| `dashboard_service.py` | Aggregation and reporting |
-| `repositories/` | SQLite data access |
-| `decorators.py` | Reusable logging, authorization and timing decorators |
-| `handler_registry.py` | Reflection-driven action registration/dispatch |
-| `task_executor.py` | Thread pool for selected blocking tasks |
+| Local, with the backend started from `backend/` | `data/tracker.sqlite3` at the repository root |
+| Render with the current configuration | `/var/data/tracker.sqlite3` |
+| Local/VPS Docker Compose | `/data/tracker.sqlite3` in the `tracker-data` volume |
 
-### 5.2. Design Principles
+`DATA_DIR` specifies the directory containing SQLite and backups. The backend uses the `sqlite3` library; PostgreSQL and a separate database container are not required. Database files and backups must not be committed to Git or served as static assets.
 
-- Encapsulation and separation of concerns between transport, services and persistence.
-- Service Layer and Repository patterns for maintainability and testability.
-- Dependency injection using FastAPI dependencies or explicit constructor injection.
-- Centralized input validation and consistent error responses.
-- Avoid floating-point money calculations; use `Decimal` or integer VND.
+Migrations run automatically when the backend starts, using `PRAGMA user_version`:
 
-## 6. Technical Implementation: Required Concepts
-
-> All techniques below are **planned applications**, not claims that code already exists. Demonstrate each with actual code, test cases and evidence in the final report.
-
-### 6.1. Networking — WebSocket over TCP/IP
-
-**Where used:** Browser ↔ Python backend on VPS.
-
-- Next.js establishes a secure `wss://` WebSocket connection to FastAPI.
-- The backend receives and responds to JSON messages with `requestId`, `action` and `payload`.
-- Support multiple connected browsers/sessions, heartbeat or ping, disconnection detection, bounded reconnect and clear errors.
-- Validate every message server-side and use authentication/authorization for any Internet-facing deployment.
-- Use Python's `asyncio`/ASGI socket handling; the underlying network transport is TCP/IP. `asyncio` concurrency is not, by itself, multithreading.
-
-**Evidence to include:** Connection logs, request/response examples, reconnect test, invalid-message test and concurrent-client test.
-
-### 6.2. Multithreading — Python `threading` / `ThreadPoolExecutor`
-
-**Where used:** Selected blocking background tasks, such as generating a report or processing a file export while the server continues serving other clients.
-
-- Create a bounded `concurrent.futures.ThreadPoolExecutor` for demonstrable blocking I/O work.
-- Submit tasks and collect results/failures without blocking the FastAPI event loop.
-- Avoid sharing mutable state without synchronization; use `threading.Lock` only when a genuine shared in-memory resource requires it.
-- Use database transactions for data consistency; a Python lock alone does not protect multiple server processes.
-- Shut down the executor cleanly and test concurrent requests.
-- Do **not** claim async WebSocket handlers alone satisfy a multithreading requirement. CPython's GIL limits CPU-bound speedups in typical configurations.
-
-**Evidence to include:** Thread names/IDs in logs, parallel blocking-I/O task test, server responsiveness under load and safe error handling.
-
-### 6.3. Metaprogramming — Decorators and Reflection
-
-**Where used:** Reusable action handling and cross-cutting backend behavior.
-
-- **Decorators:** Implement `@require_permission`, `@log_action` or `@measure_time` to wrap WebSocket action handlers. Check permissions against actual authenticated identity, not untrusted payload fields.
-- **Reflection:** Use `inspect.signature`, `getattr` or inspection of registered callables to validate handler metadata and build a controlled action registry.
-- **Dynamic handler registration:** A decorator such as `@socket_action("payment.updateStatus")` registers a callable into a whitelist-based dispatcher, avoiding a long hard-coded conditional chain.
-- Keep the registry explicit and restricted; **never** dynamically execute arbitrary action names, import paths or user-supplied code.
-- Metaclasses are optional and not necessary unless they solve a documented problem.
-
-**Evidence to include:** Decorator/registry implementation, a new action added without modifying the dispatcher, authorization tests and reflection/registration tests.
-
-### 6.4. Database and I/O
-
-- **SQLite** is the proposed persistent database on the VPS.
-- Python access through the built-in `sqlite3` module, with parameterized queries, short transactions and an independent connection per task. Enable foreign keys on every connection, WAL mode and a busy timeout; begin with one backend process.
-- JSON encoding/decoding for WebSocket messages.
-- Optional file I/O for exports/backups if implemented.
-- Configure the private data directory through `DATA_DIR`. Keep the SQLite database, WAL files, backups and application secrets outside public assets and out of Git. Use the SQLite backup API for consistent backups.
-
-### 6.5. Frontend Technology (not a GUI-course requirement)
-
-- Next.js + TypeScript for browser pages, routing and client state.
-- Tailwind CSS for consistent responsive styling.
-- Tables, forms, status indicators and charts support the domain features.
-- This replaces the old JavaFX implementation; there is **no JavaFX/FXML GUI requirement** in the revised technical scope.
-
-## 7. Proposed Repository Structure
-
-```text
-project/
-├── frontend/                     # Next.js + TypeScript + Tailwind CSS
-│   ├── app/
-│   │   ├── dashboard/
-│   │   ├── organizations/
-│   │   ├── payments/
-│   │   └── reports/
-│   ├── components/
-│   ├── lib/websocket/
-│   └── package.json
-├── backend/                      # Python + FastAPI
-│   ├── app/
-│   │   ├── main.py
-│   │   ├── networking/
-│   │   ├── services/
-│   │   ├── repositories/
-│   │   ├── metaprogramming/
-│   │   ├── concurrency/
-│   │   ├── models/
-│   │   └── schemas/
-│   ├── tests/
-│   └── requirements.txt          # or pyproject.toml
-├── deploy/
-│   ├── compose.yaml
-│   └── reverse-proxy/
-├── docs/
-├── sample-data/
-├── report/
-└── README.md
-```
-
-## 8. Requirements and Hosting
-
-| Item | Proposed choice / status |
+| Migration | Purpose |
 | --- | --- |
-| Frontend | Next.js, TypeScript, Tailwind CSS; pin versions during implementation |
-| Backend | Python 3.x, FastAPI, Uvicorn; pin versions |
-| Socket protocol | WebSocket (`wss://`) for browser ↔ backend |
-| Database | SQLite |
-| Multithreading | Python `ThreadPoolExecutor`, `threading` where needed |
-| Metaprogramming | Python decorators, `inspect`, controlled dynamic handler registry |
-| Testing | pytest, HTTP/WebSocket integration tests, Playwright optional |
-| Deployment | Linux VPS / cloud virtual server with process and network control |
-| Containers | Docker + Docker Compose (proposed) |
-| Reverse proxy | Nginx or Caddy with TLS and WebSocket support |
-| Hardware | Development computer; no ESP32 or dedicated embedded device required |
+| `001_initial.sql` | Initial schema |
+| `002_multiple_accounts.sql` | Multiple accounts, sessions, and `user_id` ownership; preserves existing data and creates a backup before upgrading from version 1 |
+| `003_organization_details.sql` | Extended organization information and status |
+| `004_payment_due_date.sql` | Separate, optional payment due date; preserves existing work dates |
 
-**Hosting clarification:** The chosen environment must allow long-running Python/ASGI services, WebSocket connections, database persistence, TLS and appropriate firewall configuration. This is why the plan specifies a **VPS**, not ordinary shared hosting.
+## 5. Running Locally
 
-## 9. Installation and Deployment Plan
+Requirements: **Node.js 24** and **Python 3.13**. The following commands use PowerShell from the repository root.
 
-> No runnable source code was supplied with the original README. The steps below are planned and must be verified after implementation.
+### Initial Dependency Installation
 
-1. Install Node.js and Python locally at the versions selected by the team.
-2. Set up frontend dependencies and backend virtual environment/dependencies.
-3. Configure `DATA_DIR` for SQLite storage and run database migrations; do not commit runtime data or secrets. When starting from `backend/`, the default database is `../data/tracker.sqlite3`.
-4. Run local Next.js and FastAPI development servers; test WebSocket actions.
-5. Provision a Linux VPS with SSH access and firewall rules.
-6. Install Docker/Compose or the selected process supervisor on the VPS.
-7. Deploy frontend, backend and reverse proxy; mount the SQLite data directory as a persistent volume and enable HTTPS/WSS.
-8. Keep the SQLite file in a private backend-only directory outside source/public assets; do not expose it through static URLs or a network filesystem.
-9. Test persistence, reconnect, backups and restart behavior.
-
-## 10. Run and Demonstration
-
-### 10.1. Local Development (illustrative)
-
-```bash
-# Frontend (after installing dependencies)
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.lock.txt
 cd frontend
-npm run dev
+npm.cmd ci
+```
 
-# Backend (separate terminal, after installing dependencies)
+If `python` resolves to the Windows Store alias, use the installed Python executable or `py -3.13` to create the virtual environment. Existing virtual environments and dependencies do not need to be reinstalled each time the application starts.
+
+### Terminal 1 — Backend
+
+```powershell
 cd backend
-uvicorn app.main:app --reload
+$env:APP_ORIGIN="http://localhost:3000"
+$env:COOKIE_SECURE="false"
+$env:WS_TICKET_AUTH="false"
+..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --ws-max-size 32768
 ```
 
-Commands are illustrative and not verified against actual project files.
+Start from `backend/` so the default `DATA_DIR` correctly resolves to `../data`. The backend reads process environment variables and does not load `.env` automatically.
 
-### 10.2. VPS Deployment (illustrative)
+### Terminal 2 — Frontend
 
-```bash
-# From the directory containing the implemented Compose configuration
-docker compose up -d --build
+```powershell
+cd frontend
+npm.cmd run dev
 ```
 
-This requires actual Dockerfiles, Compose configuration, TLS and secrets management.
+Open **http://localhost:3000**. The local configuration template in `frontend/.env.example` can be copied to `frontend/.env.local`:
 
-### 10.3. Expected Demo Workflow
+```env
+BACKEND_URL=http://127.0.0.1:8000
+NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
+```
 
-1. Open the deployed website in a browser and establish a WebSocket connection.
-2. Add an organization.
-3. Create a receivable with quantity and unit price.
-4. Observe the unpaid total on the dashboard.
-5. Mark the receivable as paid; confirm that the server response precedes UI success.
-6. Check reports and data persistence after a server restart.
-7. Simulate a connection failure and show safe recovery.
-8. Demonstrate concurrent background tasks and decorator-based message dispatch with logs/tests.
+For a new database, register at `/register`, then log in. The `python -m app.cli setup` command creates the first administrator only when no accounts exist; it is not used to add subsequent accounts.
 
-## 11. Testing
+On Linux/macOS, use `python3`, `.venv/bin/python`, and `npm` in place of the corresponding Windows commands and paths.
 
-### 11.1. Test Environment
+## 6. Vercel + Render Deployment
 
-**Not yet established.** Record actual VPS specs, OS, Python/Node versions, database version, browser, test tools and test data size.
+Full deployment instructions: **[docs/DEPLOY_VERCEL_RENDER.md](docs/DEPLOY_VERCEL_RENDER.md)**.
 
-### 11.2. Planned Test Cases
+Addresses used during deployment:
 
-| ID | Test Case | Expected Result | Status |
-| --- | --- | --- | --- |
-| TC01 | Add organization | Organization created and persisted | Planned |
-| TC02 | Create receivable: 20 × 200,000 VND | Amount = 4,000,000 VND | Planned |
-| TC03 | Invalid quantity: -1 | Validation error; no save | Planned |
-| TC04 | Mark receivable paid | Status and totals update after confirmed success | Planned |
-| TC05 | Aggregate four illustrative records | Total 9.2m; paid 6.5m; unpaid 2.7m VND | Planned |
-| TC06 | Disconnect WebSocket | Clear connection error; no false save | Planned |
-| TC07 | Delayed server response | Browser remains responsive | Planned |
-| TC08 | Competing updates to one record | Consistent final stored state | Planned |
-| TC09 | Restart application/recreate backend container | Committed data remains available | Planned |
-| TC10 | Invalid WebSocket payload | Defined error; no corrupt record | Planned |
-| TC11 | Multiple simultaneous WebSocket clients | Correct request IDs and isolated responses | Planned |
-| TC12 | Parallel blocking-I/O tasks in thread pool | Concurrent execution with logged thread IDs | Planned |
-| TC13 | Decorator-based action registry | Handler registered and invoked; unauthorized action rejected | Planned |
-| TC14 | TLS/WSS and access control | Encrypted connection; protected operations require authorization | Planned |
+- Frontend: [pay-track-app-phi.vercel.app](https://pay-track-app-phi.vercel.app).
+- Backend health: [pay-track-app.onrender.com/api/health](https://pay-track-app.onrender.com/api/health).
+- Repository: [tunablink/Pay_Track_App](https://github.com/tunablink/Pay_Track_App).
 
-### 11.3. Test Levels
+The person deploying the application has confirmed that the backend health endpoint works. Complete online operation still requires verification of the Origin configuration, login/WebSocket authentication, and persistence; local test results do not replace cloud deployment checks.
 
-- **Unit:** Calculation, validation, state transitions, reporting, decorators and dispatch registry.
-- **Integration:** WebSocket message handling, Python services and SQLite.
-- **System:** Complete organization → receivable → paid → report workflow.
-- **Concurrency/network:** Simultaneous clients, thread pool, timeouts, reconnects and conflicting writes.
-- **Deployment:** HTTPS/WSS, VPS restart and database persistence.
+### Render — Backend and SQLite
 
-## 12. Experimental Evaluation
+| Setting | Value |
+| --- | --- |
+| Runtime | Docker |
+| Root Directory | Leave empty |
+| Dockerfile Path | `./deploy/render.Dockerfile` |
+| Docker Build Context | `.` |
+| Docker Command | Leave empty; the image runs `python -m app.render_start` |
+| Health Check Path | `/api/health` |
+| Instances | 1 |
+| Persistent Disk Mount Path | `/var/data` |
 
-### 12.1. Proposed Experiments
+Persistent Disk requires a paid Render service. Do not use the temporary filesystem for durable SQLite storage. The entrypoint reads Render's `PORT`, starts one Uvicorn worker, and applies migrations during startup.
 
-1. **Multithreading:** Compare serial versus bounded-thread-pool execution of representative blocking-I/O tasks; record duration and thread IDs.
-2. **Networking:** Measure WebSocket message round-trip latency for list/create/update operations.
-3. **Concurrent clients:** Run multiple WebSocket connections and check correctness/error rates.
-4. **Failure recovery:** Test disconnect, timeout, reconnect and restart behavior.
-5. **Consistency:** Send repeated or competing updates and verify committed state.
-6. **Metaprogramming:** Verify decorator interception and automatic action registration using unit tests.
+Environment variables for the frontend URL above:
 
-### 12.2. Metrics
+```env
+DATA_DIR=/var/data
+APP_ORIGIN=https://pay-track-app-phi.vercel.app
+COOKIE_SECURE=true
+WS_TICKET_AUTH=true
+SESSION_SECONDS=28800
+```
 
-- End-to-end message latency (ms) and summary statistics.
-- Task duration and throughput for serial versus thread-pool execution.
-- Success/error counts and reconnect outcomes.
-- Correctness of totals, state changes and persisted records.
-- CPU/memory usage where measurable.
+### Vercel — Frontend
 
-**No measurements have been provided. Do not present expected results as observed performance.**
+Import **frontend / Next.js** as a single project from the repository, rather than a multi-service project for this deployment arrangement.
 
-## 13. Results
+| Setting | Value |
+| --- | --- |
+| Root Directory | `frontend` |
+| Framework / Application Preset | Next.js |
+| Node.js | 24.x |
+| Install Command | `npm ci` |
+| Build Command | `npm run build` |
+| Output Directory | Next.js default |
 
-**Pending implementation and testing.** Add actual test logs, screenshots of implemented web pages, WebSocket traces, thread execution evidence, decorator/registry tests and measured tables/plots.
+```env
+BACKEND_URL=https://pay-track-app.onrender.com
+NEXT_PUBLIC_WS_URL=wss://pay-track-app.onrender.com/ws
+NEXT_PUBLIC_WS_TICKET_AUTH=true
+```
 
-## 14. Novelty and Contributions
+Redeploy the frontend after changing environment variables because `NEXT_PUBLIC_*` values are embedded during the build. Use a stable Production URL. If the hostname changes, update the relevant URLs and `APP_ORIGIN`.
 
-### 14.1. Proposed Baseline
+**403 Origin error:** `APP_ORIGIN` on Render must exactly match the frontend origin, including `https://`, without `/login`, `/register`, or a trailing slash. For the current URL, use `https://pay-track-app-phi.vercel.app`, then save and restart/redeploy Render. Do not enable a wildcard Origin to resolve this error.
 
-Manual spreadsheet tracking or a simple single-request implementation is a possible comparison baseline; neither has been evaluated.
+A backend `GET /` or `HEAD /` returning 404 is normal; the health endpoint is `/api/health`. A 401 response from `/api/auth/session` is also normal when the user is not logged in.
 
-### 14.2. Proposed Group Contributions
+## 7. Backup, Restore, and Data Transfer
 
-1. A web-based personal receivable tracking system with Next.js and Python.
-2. Socket-based, bidirectional browser–server communication using WebSocket over TCP/IP.
-3. Explicit Python multithreading for selected blocking background tasks, with concurrency tests.
-4. Decorator- and reflection-based handler registration and reusable authorization/logging behavior.
-5. VPS deployment with SQLite persistence, secure transport and reproducible tests.
+- Administrators have a data backup action; the backend uses a thread pool for SQLite backups and reports the job status.
+- Backups are stored in `DATA_DIR/backups`, with no public download URL. The CLI supports backup/restore for operators.
+- Use the SQLite backup API instead of copying only the database file while WAL is active.
 
-**These are intended contributions, not completed work.**
+Create a local snapshot from `backend/`:
 
-## 15. Code Review and Optimization
+```powershell
+..\.venv\Scripts\python.exe -m app.cli backup --file "..\data\paytrack-deploy.sqlite3"
+```
 
-**No application source code has been reviewed.** Planned checklist:
+The CLI refuses to overwrite an existing backup. Transfer the snapshot to the Render disk using SCP or Magic Wormhole, then configure:
 
-- Separate frontend, transport, business rules and persistence.
-- Avoid floating-point money arithmetic.
-- Validate/authorize WebSocket actions on the server.
-- Do not block the event loop with synchronous I/O.
-- Bound thread-pool size; clean up threads and connections.
-- Protect shared state and use database transactions for conflicting updates.
-- Never expose SQLite files, backups, application secrets or arbitrary reflection targets to clients.
-- Verify reverse-proxy WebSocket upgrade and TLS configuration.
-- Record refactoring and measured optimization results.
+```env
+IMPORT_DATABASE_ONCE=/var/data/paytrack-deploy.sqlite3
+```
 
-## 16. Limitations
+Restart/redeploy the backend. Before starting Uvicorn, the entrypoint validates the snapshot, backs up the destination database, restores the data, revokes old sessions, applies migrations, and renames the source file with an `.imported` suffix. Subsequent restarts do not reimport the renamed file. Remove `IMPORT_DATABASE_ONCE` after confirming a successful import.
 
-- A VPS requires server administration, monitoring, backups and security updates.
-- WebSocket is a browser-compatible socket protocol, not a direct raw TCP socket API.
-- Long-running socket connections need reconnect/heartbeat handling and may be interrupted by proxies.
-- Typical CPython threading is most beneficial for blocking I/O, not CPU-heavy parallelism.
-- Single-person workflows are prioritized; complex roles and simultaneous editing are not core business features.
-- Offline editing and synchronization are not included initially.
-- Changing from Java to Python/Next.js may require explicit instructor approval if the course rubric mandates Java technologies.
+Restoring replaces the destination database with the snapshot, so complete this step before entering new data online. The local database is preserved. For a regular CLI restore, stop the backend first; see [OPERATIONS](docs/OPERATIONS.md).
 
-## 17. Future Work
+## 8. Sample Data for UI Demonstrations
 
-Potential extensions: import/export and backup/restore; partial payments and history; richer monthly/yearly reporting; stronger multi-user permissions; offline synchronization; enhanced monitoring and recovery.
+The `backend/scripts/seed_ui_demo.py` script adds fictional demonstration data to an existing account:
 
-## 18. References
+```powershell
+# From the repository root; replace USERNAME with the target account's username.
+.\.venv\Scripts\python.exe backend\scripts\seed_ui_demo.py --username USERNAME
+```
 
-### Original course/project materials
+- Adds 12 organizations across 8 types, including active and inactive organizations.
+- Adds 138 payments: 24 for the month in which the script runs, plus records covering the preceding 12 months.
+- Includes paid/unpaid records, overdue/upcoming/missing due dates, and varied quantities and unit prices.
+- Marks organization notes with `[UI-DEMO v1]`; creates a backup before insertion, preserves existing records, and prevents duplicate seeding of the same sample set.
+- Email addresses use `example.com`; names, contact information, and business records are fictional.
 
-1. `Topics.md` — Java Programming Project – Topics.
-2. `Instructions.md` — Java Programming Project – Instructions.
-3. `Rubric.md` — Java Programming Project – Assessment Rubric.
-4. Original project README and its proposed receivable features.
+During UI preparation on **4 November 2026**, this data was added to the local `tuna` account, bringing its total to **13 organizations and 139 payments**. These figures describe that dataset at that time, rather than fixed totals for every database. The records do not appear on Render automatically; transfer the SQLite snapshot to include them.
 
-### Official documentation for revised stack
+## 9. Testing
 
-- [Next.js](https://nextjs.org/docs)
-- [Tailwind CSS](https://tailwindcss.com/docs)
-- [FastAPI WebSockets](https://fastapi.tiangolo.com/advanced/websockets/)
-- [Python threading](https://docs.python.org/3/library/threading.html)
-- [Python concurrent.futures](https://docs.python.org/3/library/concurrent.futures.html)
-- [Python inspect](https://docs.python.org/3/library/inspect.html)
-- [SQLite](https://www.sqlite.org/docs.html)
-- [Docker Compose](https://docs.docker.com/compose/)
+The most recent local checks during deployment preparation passed **60 backend tests** and **18 desktop/mobile UI tests** covering Dashboard, Organizations, Payment Management, Registration, and Reports. TypeScript, ESLint, and the production build also passed. A browser test across different hostnames verified login, ticket-based WebSocket authentication, CRUD, offline/reconnection behavior, and logout revocation using a temporary database.
 
-Follow the course's attribution and AI-use rules.
+```powershell
+# Backend: run from backend/
+..\.venv\Scripts\python.exe -m pytest -q
 
-## 19. Report
+# Frontend: run from frontend/
+npm.cmd run typecheck
+npm.cmd run lint
+npm.cmd run build
+```
 
-Proposed report path:
+Run the following UI checks with the frontend available at `http://localhost:3000`. These tests use isolated data, authentication, and WebSocket fixtures:
+
+```powershell
+$env:E2E_EXTERNAL_SERVERS="1"
+node node_modules/@playwright/test/cli.js test tests/dashboard.spec.ts tests/organizations.spec.ts tests/payments-table.spec.ts tests/registration.spec.ts tests/report-charts.spec.ts
+```
+
+Verify authentication across different hostnames, also with the local frontend running:
+
+```powershell
+node scripts/check-remote-socket.mjs
+```
+
+The script creates its own temporary backend/database and stops that backend when finished. Do not use real business data for testing. See [docs/TESTING.md](docs/TESTING.md), and verify health, login, WebSocket connectivity, and data persistence after a cloud restart before confirming deployment completion.
+
+## 10. Source Code Structure
 
 ```text
-report/GroupXX_PersonalPaymentTracking_Report.docx
+frontend/
+  app/                         # login, register, dashboard, organizations, payments, reports
+  components/                  # forms, tables, header, dashboard, and charts
+  lib/                         # socket client, types, and report utilities
+  scripts/                     # production start, E2E runner, remote socket verification
+  tests/                       # Playwright
+backend/
+  app/
+    main.py                    # HTTP authentication, health, and WebSocket endpoint
+    auth.py                    # passwords, sessions, login/registration rate limits
+    config.py                  # environment configuration
+    schemas.py                 # Pydantic validation
+    dispatcher.py              # sessions, transactions, record versions, and idempotency
+    services.py                # business logic and statistics
+    registry.py                # decorators, reflection, and action timing
+    repository.py              # SQLite access and migrations
+    executor.py                # backup thread pool
+    ws_tickets.py              # one-time WebSocket tickets
+    render_start.py            # Render startup and one-time SQLite import
+    cli.py                     # setup, backup, restore, and basic seed commands
+  migrations/                  # migrations 001–004
+  scripts/seed_ui_demo.py       # varied UI demonstration data
+  tests/                       # pytest, integration, and TCP/WebSocket tests
+deploy/                        # Dockerfiles, Compose, Nginx/Caddy, Render environment template
+docs/                          # operations, testing, progress, and deployment instructions
+data/                          # local SQLite database and backups; ignored by Git
 ```
 
-The final report should cover requirements, architecture, WebSocket networking, multithreading, metaprogramming, persistence, deployment, tests, measurements, limitations and references. The original instructions specify Compilatio similarity **≤ 20%** and submission via the **LMS**; verify the latest instructor requirements.
+## 11. Limitations and Future Work
 
-## 20. Final Checklist
+- Bank integration, money transfers, partial payments, tax invoices, and an independent transaction history ledger are not implemented.
+- Offline editing and later synchronization are not supported; write operations require a backend connection.
+- SQLite and job/ticket state currently use one backend instance; multiple instances sharing a database file over a network filesystem are not supported.
+- `.xlsx`/PDF export and business spreadsheet imports are not implemented; CSV export and SQLite snapshot imports are separate features.
+- Production performance benchmarks have not been collected for publication.
+- Course reports, evidence of networking/multithreading/metaprogramming, technology requirements, and submission requirements should be checked against the instructor's guidance.
 
-### Design and Implementation
+## 12. Related Documentation
 
-- [ ] Confirm instructor approval for replacing Java/JavaFX with Next.js/Python.
-- [ ] Confirm whether WebSocket meets the socket requirement or a raw TCP demo is required.
-- [ ] Confirm VPS provider/specifications and authentication requirements.
-- [ ] Fill in group, instructor and member information.
-- [ ] Finalize page requirements, database schema and message contract.
-- [ ] Implement Next.js frontend and Tailwind styles.
-- [ ] Implement FastAPI WebSocket backend and SQLite persistence.
-- [ ] Implement and document actual Python thread-pool tasks.
-- [ ] Implement and document decorator/reflection-based handler dispatch.
-- [ ] Deploy on VPS with TLS/WSS and secured database.
-- [ ] Verify startup, reconnect, backups and failure handling.
-
-### Testing and Submission
-
-- [ ] Run unit, integration, system, socket and concurrency tests.
-- [ ] Record measured results and code evidence for technical contributions.
-- [ ] Complete code review and optimization.
-- [ ] Provide runnable source and verified deployment instructions.
-- [ ] Finish report, references and required similarity check.
-- [ ] Submit through LMS according to instructor instructions.
-
-## Decisions Awaiting Confirmation
-
-| Question | Current Position |
-| --- | --- |
-| Hosting type | **VPS / cloud virtual server selected; provider pending** |
-| Frontend stack | **Next.js + TypeScript + Tailwind CSS proposed** |
-| Backend stack | **Python + FastAPI proposed** |
-| Persistent storage | **SQLite proposed** |
-| Browser socket protocol | **WebSocket over TCP/IP proposed** |
-| Raw TCP socket required separately? | **Ask instructor** |
-| Multithreading demonstration | **Python ThreadPoolExecutor for real blocking-I/O work** |
-| Metaprogramming demonstration | **Decorators + reflection-based action registry** |
-| Java/JavaFX mandatory under course rubric? | **Confirm instructor approval** |
-
-*Update this decision log after instructor confirmation and implementation.*
+- [Vercel + Render Deployment](docs/DEPLOY_VERCEL_RENDER.md)
+- [Local/Docker Operations and Backup/Restore](docs/OPERATIONS.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Testing](docs/TESTING.md)
+- [Progress](docs/PROGRESS.md)
+- [Next.js](https://nextjs.org/docs), [FastAPI WebSocket](https://fastapi.tiangolo.com/advanced/websockets/), [SQLite](https://www.sqlite.org/docs.html)
+- [Python ThreadPoolExecutor](https://docs.python.org/3/library/concurrent.futures.html), [inspect](https://docs.python.org/3/library/inspect.html)
+- [Render Persistent Disk](https://render.com/docs/disks), [Render WebSocket](https://render.com/docs/websocket), [Vercel Build Configuration](https://vercel.com/docs/builds/configure-a-build)
