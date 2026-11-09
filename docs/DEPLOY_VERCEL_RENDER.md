@@ -1,10 +1,10 @@
-# Triển khai PayTrack: Vercel + Render + SQLite
+# Deploying PayTrack: Vercel + Render + SQLite
 
-Frontend Next.js trên Vercel; FastAPI/WebSocket trên Render; SQLite trên Persistent Disk. Không cần VPS hoặc tên miền riêng. Các địa chỉ dưới đây là ví dụ: thay bằng URL thực tế được hai nền tảng cấp.
+Next.js frontend on Vercel; FastAPI/WebSocket on Render; SQLite on Persistent Disk. A VPS and custom domain are not required. The addresses below are examples: replace them with the actual URLs assigned by the platforms.
 
-## 1. Đưa code lên GitHub
+## 1. Push the Code to GitHub
 
-Tạo repository riêng tư và đưa source mới nhất lên đó. Nếu repository local chưa có remote:
+Create a private repository and push the latest source. If the local repository has no remote yet:
 
 ```powershell
 cd "C:\Homework\JSD\New\New folder"
@@ -15,35 +15,35 @@ git remote add origin https://github.com/TEN_GITHUB/TEN_REPOSITORY.git
 git push -u origin HEAD
 ```
 
-Nếu đã có remote, bỏ lệnh `git remote add origin` và push lên branch đang sử dụng. Giữ `.gitignore` và `.dockerignore`: không đưa `.env`, database, backup, `.venv`, `node_modules` hoặc `.next` lên GitHub. Không tạo repository public để chứa bản backup SQLite.
+If a remote already exists, omit `git remote add origin` and push the current branch. Keep `.gitignore` and `.dockerignore`: do not upload `.env`, databases, backups, `.venv`, `node_modules`, or `.next` to GitHub. Do not place a SQLite backup in a public repository.
 
-## 2. Tạo backend trên Render
+## 2. Create the Render Backend
 
-Render Dashboard → New → Web Service → kết nối repository.
+Render Dashboard → New → Web Service → connect the repository.
 
-| Trường | Giá trị |
+| Setting | Value |
 | --- | --- |
-| Name | `paytrack-api` hoặc tên còn trống |
+| Name | `paytrack-api` or another available name |
 | Language / Runtime | Docker |
-| Branch | Branch đã push ở bước 1 |
-| Root Directory | Để trống: dùng gốc repository |
+| Branch | The branch pushed in step 1 |
+| Root Directory | Leave empty to use the repository root |
 | Dockerfile Path | `./deploy/render.Dockerfile` |
-| Docker Build Context | `.` nếu giao diện có trường này |
-| Docker Command | Để trống: image đã có lệnh khởi động |
+| Docker Build Context | `.` if this field is available |
+| Docker Command | Leave empty; the image already defines its startup command |
 | Health Check Path | `/api/health` |
 | Instances | 1 |
-| Instance type | Gói trả phí có hỗ trợ Persistent Disk |
+| Instance type | A paid plan supporting Persistent Disk |
 
-Thêm Persistent Disk trước khi dùng dữ liệu thật:
+Attach a Persistent Disk before using real data:
 
-| Trường | Giá trị |
+| Setting | Value |
 | --- | --- |
 | Mount Path | `/var/data` |
-| Size | 1 GB hoặc mức tối thiểu phù hợp mà giao diện cho chọn |
+| Size | 1 GB or an appropriate minimum offered by the interface |
 
-Render chỉ lưu bền vững những file nằm trong đường dẫn disk. Database là `/var/data/tracker.sqlite3`; backup nằm trong `/var/data/backups`. Không cần tạo Render Postgres.
+Render preserves only files under the disk's mount path. The database is `/var/data/tracker.sqlite3`; backups are in `/var/data/backups`. Render Postgres is not required.
 
-Thêm Environment Variables:
+Add the following Environment Variables:
 
 ```env
 DATA_DIR=/var/data
@@ -53,24 +53,24 @@ WS_TICKET_AUTH=true
 SESSION_SECONDS=28800
 ```
 
-`APP_ORIGIN` tạm thời là địa chỉ ví dụ; cập nhật URL thật ở bước 4. Không cần tự đặt `PORT`: entrypoint đọc cổng Render cấp. Docker image chạy một Uvicorn worker và migration tự động khi khởi động.
+`APP_ORIGIN` initially contains an example address; update it in step 4. There is no need to set `PORT` manually: the entrypoint reads Render's assigned port. The Docker image runs one Uvicorn worker and applies migrations automatically at startup.
 
-Tạo dịch vụ, đợi Live rồi mở `https://TEN_BACKEND.onrender.com/api/health`. Phải nhận `{"status":"ok"}`. Đường dẫn `/` không có trang giao diện nên trả 404 là bình thường.
+Create the service, wait for Live status, and open `https://TEN_BACKEND.onrender.com/api/health`. It must return `{"status":"ok"}`. The backend has no interface at `/`, so a 404 there is normal.
 
-## 3. Tạo frontend trên Vercel
+## 3. Create the Vercel Frontend
 
-Vercel Dashboard → Add New → Project → Import cùng repository.
+Vercel Dashboard → Add New → Project → import the same repository.
 
-| Trường | Giá trị |
+| Setting | Value |
 | --- | --- |
 | Framework Preset | Next.js |
 | Root Directory | `frontend` |
 | Node.js Version | 24.x |
 | Install Command | `npm ci` |
 | Build Command | `npm run build` |
-| Output Directory | Giữ mặc định của Next.js |
+| Output Directory | Keep the Next.js default |
 
-Thêm Environment Variables cho Production, dùng URL backend thật ở bước 2:
+Add Production Environment Variables using the actual backend URL from step 2:
 
 ```env
 BACKEND_URL=https://TEN_BACKEND.onrender.com
@@ -78,42 +78,42 @@ NEXT_PUBLIC_WS_URL=wss://TEN_BACKEND.onrender.com/ws
 NEXT_PUBLIC_WS_TICKET_AUTH=true
 ```
 
-`BACKEND_URL` không có `/api` ở cuối. `NEXT_PUBLIC_WS_URL` kết thúc bằng `/ws`. Các biến `NEXT_PUBLIC_` được đưa vào bundle khi build, nên đổi biến xong phải Redeploy. Không dùng `localhost`, `127.0.0.1` hoặc URL ví dụ trên bản online.
+Do not append `/api` to `BACKEND_URL`. `NEXT_PUBLIC_WS_URL` ends with `/ws`. `NEXT_PUBLIC_` variables are embedded during the build, so redeploy after changing them. Do not use `localhost`, `127.0.0.1`, or example URLs in the online deployment.
 
-Deploy và lấy URL Production cố định trong Domains, ví dụ `https://paytrack-demo.vercel.app`. Dùng URL Production cố định, không dùng URL Preview theo từng commit.
+Deploy and obtain the stable Production URL from Domains, such as `https://paytrack-demo.vercel.app`. Use the stable Production URL rather than a per-commit Preview URL.
 
-## 4. Ghép hai dịch vụ
+## 4. Connect the Two Services
 
-Quay lại Render → Environment:
+Return to Render → Environment:
 
 ```env
 APP_ORIGIN=https://paytrack-demo.vercel.app
 ```
 
-Thay bằng URL Production thật, không có dấu `/` ở cuối. Save và để Render khởi động lại. Nếu sau này thay domain frontend, cập nhật lại `APP_ORIGIN`.
+Replace this with the actual Production URL without a trailing `/`. Save and allow Render to restart. Update `APP_ORIGIN` again if the frontend domain changes later.
 
-API `/api/*` được Next.js proxy đến Render; cookie HttpOnly thuộc frontend. Trình duyệt lấy vé WebSocket qua `POST /api/auth/ws-ticket`, rồi gửi vé trong WebSocket subprotocol tới Render. Vé dùng một lần và hết hạn sau 30 giây, không cần cookie bên thứ ba hoặc CORS wildcard. Mỗi lần reconnect lấy vé mới. Backend vẫn kiểm tra session với từng thao tác, nên đăng xuất thu hồi quyền của socket đang mở. Không ghi vé hoặc cookie vào URL/log.
+Next.js proxies `/api/*` to Render; the HttpOnly cookie belongs to the frontend. The browser obtains a WebSocket ticket through `POST /api/auth/ws-ticket` and sends it to Render in the WebSocket subprotocol. Tickets are single-use and expire after 30 seconds, avoiding third-party cookies and wildcard CORS. Each reconnect obtains a new ticket. The backend still checks the session on every action, so logout revokes the open socket's authorization. Do not place tickets or cookies in URLs/logs.
 
-## 5. Giữ tài khoản và dữ liệu SQLite hiện tại
+## 5. Preserve Existing Accounts and SQLite Data
 
-Nếu muốn giữ tài khoản `tuna` và dữ liệu mẫu, dùng cách nhập một lần dưới đây. Nếu muốn database mới, bỏ bước này rồi đăng ký tại URL Vercel; tài khoản đầu tiên có quyền quản trị backup.
+To retain the `tuna` account and sample data, use the one-time import below. For a fresh database, skip this step and register at the Vercel URL; the first account administers backups.
 
-### 5.1 Tạo bản sao trên Windows
+### 5.1 Create a Snapshot on Windows
 
-Trong PowerShell, chạy từ thư mục backend:
+In PowerShell, run from the backend directory:
 
 ```powershell
 cd "C:\Homework\JSD\New\New folder\backend"
 ..\.venv\Scripts\python.exe -m app.cli backup --file "..\data\paytrack-deploy.sqlite3"
 ```
 
-CLI không ghi đè file đã tồn tại. Nếu đã có file này, dùng tên khác và thay tên tương ứng ở các bước tiếp theo. Dùng backup API của dự án, không copy riêng file SQLite đang mở.
+The CLI does not overwrite existing files. If this file already exists, choose another name and update subsequent steps accordingly. Use the project's backup API rather than copying only an open SQLite database file.
 
-### 5.2 Chuyển file qua Magic Wormhole
+### 5.2 Transfer the File with Magic Wormhole
 
-Có thể dùng SCP theo hướng dẫn Connect của Render, hoặc dùng Magic Wormhole trong Render Shell. File chuyển trực tiếp vào Persistent Disk, không qua GitHub.
+Use SCP as described in Render's Connect instructions, or Magic Wormhole in Render Shell. Transfer the file directly to Persistent Disk, not through GitHub.
 
-Trên PowerShell của máy bạn:
+In PowerShell on your machine:
 
 ```powershell
 cd "C:\Homework\JSD\New\New folder"
@@ -121,9 +121,9 @@ cd "C:\Homework\JSD\New\New folder"
 .\.venv\Scripts\wormhole.exe send .\data\paytrack-deploy.sqlite3
 ```
 
-Giữ terminal này mở và lấy mã chuyển file được in ra. Không đưa mã vào source hoặc chia sẻ công khai.
+Keep this terminal open and copy the transfer code printed by the command. Do not put the code in source files or share it publicly.
 
-Render → dịch vụ backend → Shell:
+Render → backend service → Shell:
 
 ```bash
 python -m pip install magic-wormhole
@@ -131,42 +131,42 @@ cd /var/data
 wormhole receive
 ```
 
-Nhập mã từ máy bạn và chấp nhận nhận file. Kiểm tra file đã nằm tại `/var/data/paytrack-deploy.sqlite3`.
+Enter the code from your machine and accept the file. Confirm it is located at `/var/data/paytrack-deploy.sqlite3`.
 
-### 5.3 Nhập trước khi backend khởi động
+### 5.3 Import Before the Backend Starts
 
-Thêm biến Render:
+Add this Render variable:
 
 ```env
 IMPORT_DATABASE_ONCE=/var/data/paytrack-deploy.sqlite3
 ```
 
-Save và restart/redeploy backend. Entrypoint chạy trước Uvicorn: kiểm tra file, backup database đích vào `/var/data/backups/pre-render-import-*.sqlite3`, phục hồi, thu hồi session cũ, áp dụng migration rồi đổi tên nguồn thành `paytrack-deploy.sqlite3.imported`. Log thành công: `SQLite import completed; old sessions revoked.`
+Save and restart/redeploy the backend. Before Uvicorn starts, the entrypoint validates the file, backs up the destination database to `/var/data/backups/pre-render-import-*.sqlite3`, restores the snapshot, revokes old sessions, applies migrations, and renames the source to `paytrack-deploy.sqlite3.imported`. The success log reads: `SQLite import completed; old sessions revoked.`
 
-Không chạy restore thủ công khi backend đang phục vụ request. Cơ chế nhập ở entrypoint tránh việc này. File nguồn được đổi tên nên restart sau không nhập lại và không ghi đè các thay đổi mới. Sau khi xác nhận thành công, xóa biến `IMPORT_DATABASE_ONCE` khỏi Render cho gọn.
+Do not manually restore while the backend is serving requests. The entrypoint import avoids that situation. Renaming the source prevents subsequent restarts from importing again and overwriting new changes. After confirming success, remove `IMPORT_DATABASE_ONCE` from Render.
 
-Đăng nhập ở Vercel bằng username/mật khẩu cũ. Bản local được giữ nguyên. Không đăng ký hoặc nhập dữ liệu thật trên Render trước khi phục hồi, trừ khi chủ động chấp nhận thay database đích bằng bản local.
+Log in on Vercel using the existing username/password. The local database remains unchanged. Do not register accounts or enter real data on Render before restoring unless you deliberately accept replacing the destination database with the local snapshot.
 
-## 6. Kiểm tra sau triển khai
+## 6. Post-Deployment Checks
 
-1. Mở `/api/health` ở Render và `/api/health` ở Vercel, cả hai phải trả status ok.
-2. Đăng nhập trên Vercel; mở Tổng quan, Đơn vị, Quản lí khoản thu, Báo cáo.
-3. Trong Network: `/api/auth/ws-ticket` trả 200; WebSocket `/ws` trên Render upgrade 101 và có message phản hồi.
-4. Tạo/sửa một khoản thu, tick đã nhận, tải lại trang và kiểm tra kết quả.
-5. Đăng xuất rồi đăng nhập lại; dữ liệu vẫn đúng tài khoản.
-6. Restart Render, đăng nhập lại và xác nhận bản ghi đã tạo vẫn còn.
-7. Sao lưu định kỳ; không xóa disk hoặc thay mount path khi cập nhật.
+1. Open `/api/health` on Render and `/api/health` on Vercel; both must return status ok.
+2. Log in on Vercel and open Dashboard, Organizations, Payment Management, and Reports.
+3. In Network, `/api/auth/ws-ticket` should return 200; Render's WebSocket `/ws` should upgrade with status 101 and exchange response messages.
+4. Create/edit a payment, mark it paid, reload, and check the result.
+5. Log out and back in; verify the data still belongs to the correct account.
+6. Restart Render, log in again, and confirm the new record remains.
+7. Back up regularly; do not delete the disk or change its mount path during updates.
 
-## Lỗi thường gặp
+## Troubleshooting
 
-| Hiện tượng | Cách kiểm tra |
+| Symptom | What to Check |
 | --- | --- |
-| Origin không hợp lệ / 403 | `APP_ORIGIN` trên Render phải khớp chính xác URL frontend đang mở |
-| `/api/auth/ws-ticket` trả 404 | Đã bật `WS_TICKET_AUTH=true` trên Render và deploy code mới chưa? |
-| Ticket trả 401 | Phiên hết hạn hoặc cookie chưa được lưu; đăng nhập lại trên Vercel |
-| Đăng nhập được nhưng socket không kết nối | Kiểm tra `wss://.../ws`, hai biến ticket=true và Redeploy frontend sau khi đổi biến |
-| API Vercel trả 502 | Kiểm tra backend Live, health và `BACKEND_URL` đúng hostname, không có `/api` ở cuối |
-| Dữ liệu biến mất sau restart | Disk đã gắn đúng `/var/data` và `DATA_DIR=/var/data` chưa? |
-| Production chạy nhưng Preview không đăng nhập được | Backend chỉ chấp nhận Production origin đã cấu hình; không mở wildcard chỉ để chạy Preview |
+| Invalid Origin / 403 | Render's `APP_ORIGIN` must exactly match the frontend URL being used |
+| `/api/auth/ws-ticket` returns 404 | Confirm `WS_TICKET_AUTH=true` on Render and that the latest code is deployed |
+| Ticket endpoint returns 401 | The session expired or the cookie was not stored; log in again on Vercel |
+| Login works but the socket does not connect | Check `wss://.../ws`, both ticket flags set to true, and frontend redeployment after variable changes |
+| Vercel API returns 502 | Check backend Live status, health, and the correct `BACKEND_URL` hostname without a trailing `/api` |
+| Data disappears after restart | Check the `/var/data` disk mount and `DATA_DIR=/var/data` |
+| Production works but Preview login fails | The backend accepts only the configured Production origin; do not enable a wildcard merely to allow Preview |
 
-Tài liệu chính thức: [Render FastAPI](https://render.com/docs/deploy-fastapi), [Persistent Disk](https://render.com/docs/disks), [WebSocket](https://render.com/docs/websocket), [Vercel build/root directory](https://vercel.com/docs/builds/configure-a-build).
+Official documentation: [Render FastAPI](https://render.com/docs/deploy-fastapi), [Persistent Disk](https://render.com/docs/disks), [WebSocket](https://render.com/docs/websocket), [Vercel build/root directory](https://vercel.com/docs/builds/configure-a-build).

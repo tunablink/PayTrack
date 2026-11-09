@@ -1,95 +1,95 @@
-# Kết quả kiểm tra thực tế — 02/11/2026
+# Observed Test Results — 2 November 2026
 
-Môi trường: Windows, Node.js 24.15.0, npm 11.12.1, Python 3.13.7, Chrome đã cài trên máy; Next.js 16.4.4/React 19.3.1. Backend và E2E dùng database tạm riêng; không tạo tài khoản mặc định hoặc ghi dữ liệu mẫu vào database sử dụng thực tế.
+Environment: Windows, Node.js 24.15.0, npm 11.12.1, Python 3.13.7, installed Chrome, and Next.js 16.4.4/React 19.3.1. Backend and E2E tests used separate temporary databases; they did not create default accounts or insert sample data into the database used by the application.
 
-## Đã chạy
+## Checks Executed
 
-| Kiểm tra | Kết quả |
+| Check | Result |
 | --- | --- |
-| Backend `python -m pytest -q` | **25 passed**; 6 cảnh báo deprecation từ TestClient/httpx và Uvicorn/websockets legacy, không có test lỗi |
-| Frontend `npm run lint` | Đạt, 0 error / 0 warning ở lượt kiểm tra sau sửa |
-| Frontend `npm run typecheck` | Đạt |
-| Frontend `npm run build` | Đạt; sinh đủ route /login, /dashboard, /organizations, /payments, /reports |
-| Chrome Playwright desktop 1280×720 và mobile 390×664 (CSS viewport iPhone 13 emulation) | 4/4 kiểm thử đã đạt; mobile là Chromium emulation, không phải Safari trên thiết bị thật |
+| Backend `python -m pytest -q` | **25 passed**; 6 deprecation warnings from TestClient/httpx and Uvicorn/websockets legacy; no failures |
+| Frontend `npm run lint` | Passed, 0 errors / 0 warnings in the post-fix run |
+| Frontend `npm run typecheck` | Passed |
+| Frontend `npm run build` | Passed; generated /login, /dashboard, /organizations, /payments, and /reports |
+| Chrome Playwright desktop 1280×720 and mobile 390×664 (iPhone 13 CSS viewport emulation) | 4/4 tests passed; mobile used Chromium emulation rather than Safari on a real device |
 | `npm audit --omit=dev` | 0 vulnerabilities |
-| `npm audit` gồm development dependencies | 16 moderate trong chuỗi ESLint/minimatch; không có high/critical. Không áp dụng gợi ý downgrade phá vỡ tương thích từ audit |
-| Compose HTTP `docker --config deploy compose --env-file .env.example -f deploy/compose.yaml config --quiet` | Đạt |
-| Compose HTTPS override, đặt DOMAIN mẫu rồi `config --quiet` với cả hai file | Đạt |
+| `npm audit`, including development dependencies | 16 moderate findings in the ESLint/minimatch chain, with no high/critical findings. Audit suggestions requiring incompatible downgrades were not applied |
+| HTTP Compose `docker --config deploy compose --env-file .env.example -f deploy/compose.yaml config --quiet` | Passed |
+| HTTPS Compose override with an example DOMAIN and `config --quiet` for both files | Passed |
 
-## Nội dung backend
+## Backend Coverage
 
-- Auth, cookie session, Origin HTTP/WebSocket, CSRF, rate limit, logout trên socket đang mở, session hết hạn và giữ session qua app restart.
-- CRUD đơn vị/khoản thu, trim tên, validate dữ liệu, tính 20×200.000=4.000.000, làm tròn 1.005×100=101 đồng, reject field amount và trạng thái ngoài PAID/UNPAID.
-- Không xóa đơn vị còn khoản thu ở cả service và SQLite FK.
-- Tổng phải thu = đã nhận + chưa nhận, Dashboard/Report thống nhất, nhóm đơn vị/tháng, search/filter/pagination.
-- Idempotency cùng key/cùng payload không ghi trùng; key khác nội dung bị từ chối; hai writer cạnh tranh chỉ một version update thành công; SQLite busy trả lỗi có kiểm soát.
-- WebSocket JSON lỗi, schema lỗi, unknown action, nhiều client, reconnect với requestId khớp response; test riêng dùng Uvicorn thực và `websockets.sync` qua TCP loopback.
-- Registry phản xạ signature, tên trùng, handler mới và whitelist.
-- Backup trong thread pool, log thread name/ID; ping vẫn được xử lý khi worker backup đang chờ I/O; mô phỏng lỗi ổ đĩa, kiểm tra trạng thái FAILED và shutdown.
-- Backup/restore API sang DB tạm, integrity_check và đối chiếu tiền; chạy thật CLI backup/restore qua subprocess, restore thu hồi session.
-- Tổng danh mục bị giới hạn ở số nguyên an toàn JSON/JavaScript; kiểm thử 9 khoản × 10^15 đồng và từ chối khoản thứ 10 trước commit.
+- Authentication, session cookies, HTTP/WebSocket Origin, CSRF, rate limits, logout on an open socket, expired sessions, and session persistence across application restarts.
+- Organization/payment CRUD, name trimming, input validation, 20×200,000=4,000,000 calculations, 1.005×100=101 VND rounding, rejection of client amount fields, and statuses outside PAID/UNPAID.
+- Organization deletion blocked while linked payments exist, at both service and SQLite foreign-key levels.
+- Total receivables = paid + unpaid; Dashboard/Report consistency, organization/month grouping, search/filter/pagination.
+- Identical idempotency key/payload combinations do not duplicate writes; keys reused with different content are rejected; competing writers allow only one version update; SQLite busy errors are handled.
+- Invalid WebSocket JSON, schema errors, unknown actions, multiple clients, and reconnection with matching request/response requestIds. A separate test uses real Uvicorn and `websockets.sync` over TCP loopback.
+- Registry signature reflection, duplicate names, new handlers, and allowlisting.
+- Backups in a thread pool with thread name/ID logs; pings continue while a backup worker waits for I/O. Simulated disk failures, FAILED status, and shutdown are covered.
+- Backup/restore APIs against temporary databases, integrity_check, and amount reconciliation; real CLI backup/restore subprocesses and session revocation on restore.
+- Portfolio totals are limited to safe JSON/JavaScript integers; tests allow 9 payments × 10^15 VND and reject the tenth before commit.
 
-## Nội dung trình duyệt
+## Browser Coverage
 
-Đăng nhập, điều hướng, thêm đơn vị, hủy/ESC và bỏ thay đổi chưa lưu, thêm/xem/sửa/xóa khoản phải thu, đổi Đã nhận/Chưa nhận hai chiều, đối chiếu báo cáo, lọc đơn vị/trạng thái/ngày, chặn xóa đơn vị đang có khoản thu, sửa ghi chú, xóa đơn vị sau khi đã xóa khoản thu, tìm kiếm/empty state, reset filter, offline giữ snapshot/khóa ghi, online reconnect và snapshot mới, backup trên cả desktop/mobile, logout. Lượt cuối: **4 passed (52.4s)**.
+Login, navigation, organization creation, cancel/ESC and discarding unsaved changes, payment create/view/edit/delete, both Paid/Unpaid transitions, report reconciliation, organization/status/date filters, blocking deletion of organizations with payments, editing notes, deleting organizations after their payments are removed, search/empty states, resetting filters, offline snapshot preservation/write disabling, online reconnection and fresh snapshots, desktop/mobile backups, and logout. Final run: **4 passed (52.4s)**.
 
-Test mô phỏng **commit thành công nhưng response bị mất** bằng Playwright WebSocket routing. Sau timeout, UI phải báo “Kết quả lưu chưa xác định”, không báo “Đã lưu thay đổi”; sau reconnect chỉ có đúng một dòng đã commit.
+A test simulates a **successful commit with a lost response** using Playwright WebSocket routing. After timeout, the UI must report an uncertain save outcome rather than a successful save; after reconnection, exactly one committed row must exist.
 
-Đã chụp và xem trực tiếp PNG của bảng khoản thu và báo cáo trên desktop/mobile. Kiểm tra chiều rộng trang không vượt viewport; bảng rộng cuộn trong vùng bảng. Nội dung công việc/ghi chú dài được thử trong form và bảng. Không có lỗi JavaScript `pageerror` trong luồng nghiệp vụ chính.
+Desktop/mobile payment-table and report PNGs were captured and inspected directly. Page width was checked against the viewport; wide tables scroll within their containers. Long work descriptions/notes were tested in forms and tables. The main business workflow produced no JavaScript `pageerror` events.
 
-Ảnh runtime ở `docs/screenshots/` (gitignored, có thể tạo lại bằng test): payments-desktop.png, payments-mobile.png, reports-desktop.png, reports-mobile.png. Đây là dữ liệu kiểm thử ghi vào backend thật, không phải dữ liệu mock trên màn hình sản phẩm.
+Runtime screenshots are stored in `docs/screenshots/` (Git-ignored and reproducible through tests): payments-desktop.png, payments-mobile.png, reports-desktop.png, reports-mobile.png. These screenshots show test data written to a real backend, rather than mock data embedded in the product interface.
 
-## Lỗi đã phát hiện và sửa trong quá trình kiểm tra
+## Issues Found and Fixed During Testing
 
-- Lỗi nằm sau modal: thêm thông báo lỗi ngay bên trong dialog.
-- Label bọc select/textarea có nội dung làm truy vấn/nhãn không ổn định: chuyển thành label htmlFor + id riêng bằng React useId.
-- Chuyển offline nhưng WebSocket cũ còn OPEN: xử lý sự kiện online/offline, reject pending, bỏ socket cũ và khóa ghi ngay.
-- Nút backup bị ẩn ở mobile: đưa thao tác vào header khi sidebar thu gọn.
-- Tailwind utility hidden bị CSS component override: dùng quy tắc responsive rõ ràng cho nút backup.
-- Cấu hình test sinh lại mật khẩu khi worker nạp config: tái sử dụng mật khẩu ngẫu nhiên của cùng test run qua process env.
-- Runner Playwright tự dọn server trên Windows không ổn định: dùng wrapper quản lý trực tiếp các child process do test tạo và dừng chúng khi kết thúc.
+- Errors appeared behind modals: added error messages inside dialogs.
+- Labels wrapping select/textarea content made queries/labels unstable: replaced them with label htmlFor + independent IDs generated by React useId.
+- The old WebSocket remained OPEN after going offline: added online/offline event handling, rejected pending requests, discarded the old socket, and disabled writes immediately.
+- The backup button was hidden on mobile: moved the action to the header when the sidebar collapses.
+- Component CSS overrode Tailwind's hidden utility: added explicit responsive rules for the backup button.
+- Test configuration regenerated passwords when workers loaded it: reused the same run's random password through process environment variables.
+- Playwright server cleanup on Windows was unreliable: added a wrapper that directly manages test-created child processes and stops them afterward.
 
-## Chưa được xác minh
+## Not Yet Verified
 
-- Docker Engine daemon không chạy (`npipe docker_engine` không tồn tại); vì vậy **chưa build/chạy image Linux**, chưa kiểm tra volume sau recreate container. Chỉ kiểm tra cú pháp Compose thành công.
-- Chưa có VPS/domain; chưa kiểm thử chứng chỉ TLS/WSS, proxy upgrade trong container thực hay firewall production.
-- Chưa thử Safari/iOS hoặc Android trên thiết bị thật; mobile hiện là Chrome emulation.
-- Chưa benchmark tải lớn hoặc tốc độ multithreading; không đưa số liệu hiệu năng suy đoán.
+- The Docker Engine daemon was unavailable (`npipe docker_engine` did not exist), so **Linux images had not been built/run**, and volume persistence after container recreation had not been tested. Compose syntax validation passed.
+- No VPS/domain was available; TLS/WSS certificates, proxy upgrades in real containers, and the production firewall had not been tested.
+- Real Safari/iOS or Android devices had not been tested; mobile checks used Chrome emulation.
+- Large-load or multithreading performance benchmarks had not been run; no speculative performance figures were reported.
 
-Lệnh kiểm tra lại Docker sau khi daemon hoạt động:
+Commands for checking Docker after the daemon becomes available:
 
 ```bash
 docker compose --env-file .env -f deploy/compose.yaml build
 docker compose --env-file .env -f deploy/compose.yaml run --rm backend python -m app.cli setup
 docker compose --env-file .env -f deploy/compose.yaml up -d
 docker compose --env-file .env -f deploy/compose.yaml ps
-# Ghi một đơn vị và khoản phải thu, sau đó recreate và kiểm tra lại dữ liệu:
+# Create an organization and a payment, then recreate and verify the data:
 docker compose --env-file .env -f deploy/compose.yaml up -d --force-recreate
 ```
 
-Xem OPERATIONS.md cho HTTPS override, backup/restore và update. Không dùng down -v trong quy trình kiểm tra persistence.
+See OPERATIONS.md for the HTTPS override, backup/restore, and updates. Do not use down -v when testing persistence.
 
-## Bổ sung 04/11/2026 — Đăng ký đầu tiên
+## Addition — 4 November 2026: First Registration
 
-Backend hiện đạt **34 passed**, gồm 9 trường hợp mới: tạo owner đầu tiên, trim tên/hash Argon2/đăng nhập, tự đóng đăng ký, 6 dữ liệu không hợp lệ, CSRF/Origin và hai request cạnh tranh (chỉ 201 + 409). Lỗi validation không phản chiếu mật khẩu về client. Tất cả chạy trên database tạm.
+The backend reached **34 passed**, including 9 new cases: initial-owner creation, username trimming/Argon2 hashing/login, automatic registration closure, 6 invalid inputs, CSRF/Origin, and competing requests (only 201 + 409). Validation errors did not echo passwords to the client. All cases used temporary databases.
 
-Playwright riêng cho đăng ký đạt **4 passed (22.6s)** trên desktop/mobile: link đăng ký khi chưa có owner, xác nhận mật khẩu sai, submit thành công, quay về đăng nhập, không có link khi đã có owner, /register bị đóng và trường hợp backend đóng đăng ký khi form đang mở. Các test trình bày này mock endpoints auth, không truy cập tài khoản/dữ liệu thật; backend API thật được kiểm tra ở pytest. Ảnh form đã được xem tại docs/screenshots/register-desktop.png và register-mobile.png.
+Dedicated registration Playwright tests achieved **4 passed (22.6s)** on desktop/mobile: registration links when no owner existed, incorrect password confirmation, successful submission, returning to login, no link after an owner existed, a closed /register page, and backend registration closure while the form remained open. These presentation tests mocked auth endpoints without accessing real accounts/data; real backend APIs were tested through pytest. Form screenshots were inspected at docs/screenshots/register-desktop.png and register-mobile.png.
 
-Production build thành công với route /register. Để backend đang chạy nhận endpoint mới, khởi động lại Uvicorn nếu không dùng --reload. Khi đã có owner trong database thực, đăng ký đóng theo thiết kế; có thể thử luồng mở bằng database demo riêng qua DATA_DIR.
+The production build succeeded with /register. Running backends needed a Uvicorn restart to load the new endpoints unless using --reload. At this stage, registration closed by design when the real database already had an owner; the open-registration flow could be tested using a separate demo database configured through DATA_DIR.
 
-## Cập nhật nhiều tài khoản — 04/11/2026
+## Multiple-Account Update — 4 November 2026
 
-Phần này thay thế quy tắc đăng ký chủ sở hữu đầu tiên ở mục cập nhật trước. Đăng ký hiện luôn mở, mỗi username tạo một không gian dữ liệu riêng; tài khoản ban đầu giữ quyền sao lưu toàn database.
+This section supersedes the first-owner registration rule in the previous update. Registration now remains open, each username has a separate data workspace, and the initial account retains whole-database backup privileges.
 
-- Backend: **38 passed**, gồm migration v1→v2 bảo toàn tài khoản/hash/session/dữ liệu/phiên bản/idempotency và tạo backup trước migration, hai tài khoản độc lập, chặn đọc/sửa/xóa ID tài khoản khác, FK chặn liên kết chéo, idempotency theo user_id, chuyển đăng nhập thu hồi phiên cũ, duplicate/race/rate-limit đăng ký.
-- Frontend typecheck/lint/production build: đạt.
-- Playwright UI header + đăng ký: **6 passed (38.9s)** trên desktop/mobile, có endpoint giả lập để kiểm tra hiển thị, form tiếp tục mở và tên đăng nhập trùng.
-- Playwright E2E **thật** nhiều tài khoản: **2 passed (46.7s)** trên desktop/mobile. Đăng ký A/B, đăng nhập A tạo đơn vị và khoản thu 24.690 đồng, đăng nhập B kiểm tra danh sách/tổng rỗng, đăng nhập lại A đối chiếu tổng và dữ liệu còn nguyên; cả hai tài khoản mới không có nút sao lưu toàn hệ thống.
-- Do dev server đang chiếm cổng 3000/8000, E2E nhiều tài khoản chạy backend thực trên cổng 18100 với database tạm của tests.e2e_server. Playwright chuyển tiếp auth HTTP và WebSocket tới backend tạm, không giả lập kết quả nghiệp vụ và không ghi database sử dụng thực tế. Backend tạm đã dừng sau kiểm thử.
-- Test tests/multi-account.spec.ts chỉ chạy khi E2E_ISOLATED_DATA=1; npm run test:e2e tự đặt cờ này và tự tạo database tạm. Có thể dùng E2E_BACKEND_URL với một backend tạm riêng khi frontend dev đang chạy. Không đặt cờ này để chạy lên backend có dữ liệu thật.
+- Backend: **38 passed**, covering v1→v2 migration preserving accounts/hashes/sessions/data/versions/idempotency and creating a pre-migration backup; two independent accounts; blocked cross-account ID reads/updates/deletions; foreign keys blocking cross-account links; user_id-scoped idempotency; login switching revoking the previous session; and registration duplicate/race/rate-limit cases.
+- Frontend typecheck/lint/production build: passed.
+- Playwright header + registration UI: **6 passed (38.9s)** on desktop/mobile, with simulated endpoints to check presentation, continued registration availability, and duplicate usernames.
+- **Real** multiple-account Playwright E2E: **2 passed (46.7s)** on desktop/mobile. Registered A/B, logged in as A to create an organization and a 24,690 VND payment, logged in as B to verify empty lists/totals, and returned to A to verify unchanged totals/data. Neither newly created account had a whole-system backup button.
+- Because development servers occupied ports 3000/8000, multiple-account E2E used a real backend on port 18100 with tests.e2e_server's temporary database. Playwright forwarded auth HTTP and WebSocket traffic to that backend without mocking business results or writing to the actual application database. The temporary backend was stopped afterward.
+- tests/multi-account.spec.ts runs only when E2E_ISOLATED_DATA=1; npm run test:e2e sets this flag and creates a temporary database automatically. E2E_BACKEND_URL can target a separate temporary backend while the development frontend is running. Do not use this flag against a backend containing real data.
 
-## Bổ sung 04/11/2026 — Biểu đồ báo cáo
+## Addition — 4 November 2026: Report Charts
 
-Bốn kiểm thử Playwright riêng cho biểu đồ đạt **4 passed (17.6s)** trên desktop/mobile. Các trường hợp: tháng/quý, Q1 cộng đúng 3.000.000 đồng đã nhận và 500.000 đồng chưa nhận từ nhiều tháng; tỷ lệ đã nhận 70,6%; xếp hạng chưa nhận 60%/40%; bật đường tổng; số liệu thay đổi theo đơn vị/trạng thái/ngày; bộ lọc không có dữ liệu; khoản 0 đồng không sinh NaN/Infinity; không tràn ngang toàn trang. Đã sửa việc hover chuột ghi đè lựa chọn đang focus bằng bàn phím.
+Four dedicated chart Playwright tests achieved **4 passed (17.6s)** on desktop/mobile. Cases covered month/quarter views; correct Q1 aggregation of 3,000,000 VND paid and 500,000 VND unpaid across multiple months; a 70.6% paid share; unpaid rankings of 60%/40%; toggling the total line; statistics changing with organization/status/date filters; empty filters; zero-value payments without NaN/Infinity; and no page-wide horizontal overflow. Mouse hover overriding keyboard-focused selection was fixed.
 
-Test dùng summary fixtures được phân biệt trong tests/report-charts.spec.ts, chỉ phục vụ UI. Sản phẩm lấy trực tiếp summary của backend, không có dữ liệu mẫu được nhúng vào component. Các bảng đối chiếu hiện có được giữ lại để xem số chính xác. Không đổi schema hay API, không thêm thư viện. Ảnh runtime ở docs/screenshots/report-charts-desktop.png và report-charts-mobile.png; đã xem cả hai. Production build thành công.
+The test uses explicitly separated summary fixtures in tests/report-charts.spec.ts for UI coverage only. The product reads the backend summary directly without sample data embedded in components. Existing reconciliation tables were retained for exact figures. No schema/API changes or new libraries were introduced. Runtime screenshots at docs/screenshots/report-charts-desktop.png and report-charts-mobile.png were both inspected. The production build succeeded.

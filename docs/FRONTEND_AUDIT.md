@@ -1,46 +1,45 @@
-# Kiểm kê và quyết định chuyển đổi
+# Inventory and Migration Decisions
 
-Đã đọc toàn bộ `README.md`, 4 HTML và DESIGN.md. Không có `README_UPDATED.md` trong bộ nguồn. Quyết định trong yêu cầu đính kèm được ưu tiên hơn README cũ.
+The complete `README.md`, four HTML files, and DESIGN.md were reviewed. The source did not contain `README_UPDATED.md`. Decisions in the attached request take precedence over the old README.
 
-## Tệp nguồn
+## Source Files
 
-| Thư mục | Tệp | Nội dung |
+| Directory | Files | Content |
 | --- | --- | --- |
-| personal_payment_tracking_system_dashboard | code.html, screen.png | Tổng quan, KPI, bảng gần đây, lịch sử và nhắc việc mẫu |
-| qu_n_l_t_ch_c_paytrack | code.html, screen.png | Bảng đơn vị, tìm kiếm, modal thêm đơn vị |
-| qu_n_l_kho_n_thu_minimalist_paytrack | code.html, screen.png | Bảng khoản thu, bộ lọc, nút sửa/đánh dấu nhận |
-| b_o_c_o_ph_n_t_ch_t_i_ch_nh_paytrack | code.html, screen.png | Tổng hợp, biểu đồ, modal xuất báo cáo |
-| warm_financial_atelier | DESIGN.md | Màu, typography, spacing và hướng dẫn thiết kế |
+| personal_payment_tracking_system_dashboard | code.html, screen.png | Dashboard, KPIs, recent table, sample history, and reminders |
+| qu_n_l_t_ch_c_paytrack | code.html, screen.png | Organization table, search, and add-organization modal |
+| qu_n_l_kho_n_thu_minimalist_paytrack | code.html, screen.png | Payment table, filters, and edit/mark-paid actions |
+| b_o_c_o_ph_n_t_ch_t_i_ch_nh_paytrack | code.html, screen.png | Summaries, charts, and report-export modal |
+| warm_financial_atelier | DESIGN.md | Colors, typography, spacing, and design guidance |
 
-Tổng: **4 HTML, 4 PNG, 1 Markdown**. Không có CSS/JS/font/icon nhị phân riêng. CSS và JavaScript nhúng trong HTML. Font Google Fonts: Be Vietnam Pro, Plus Jakarta Sans; Material Symbols được gọi lặp nhiều lần. Dashboard dùng SVG inline; PNG là ảnh chụp tham chiếu, không phải ảnh nghiệp vụ. Tailwind được nạp bằng CDN runtime ở cả bốn màn hình. `scripts/audit.cjs` đọc toàn bộ HTML để liệt kê văn bản, scripts và liên kết.
+Total: **4 HTML files, 4 PNG files, and 1 Markdown file**. There are no separate CSS/JS/font/icon binaries. CSS and JavaScript are embedded in HTML. Google Fonts includes Be Vietnam Pro and Plus Jakarta Sans; Material Symbols is requested repeatedly. The dashboard uses inline SVG; PNGs are reference screenshots rather than business images. All four screens load Tailwind from a runtime CDN. `scripts/audit.cjs` reads all HTML files to inventory text, scripts, and links.
 
-## Đánh giá
+## Assessment
 
-| Phần | Quyết định | Lý do |
+| Element | Decision | Reason |
 | --- | --- | --- |
-| PayTrack, sắc cam, nền sáng, điều hướng trái | Giữ, tinh chỉnh | Nhận diện và cấu trúc đã phù hợp ứng dụng quản lý |
-| Bốn màn hình, KPI, bảng, bộ lọc và luồng dialog | Chuyển thành Next.js/React | Dùng component TypeScript dùng chung và dữ liệu WebSocket thật |
-| Font Be Vietnam Pro | Giữ, tự host bằng npm | Hỗ trợ dấu tiếng Việt; bỏ phụ thuộc CDN khi chạy |
-| Material Symbols, SVG phân tán | Chuyển sang Lucide | Đồng nhất nét và kích thước, không cần tải font icon |
-| Header/sidebar bị lặp và kích thước desktop cố định | Chỉnh | Một shell chung, mobile có thanh điều hướng dưới và bảng cuộn trong vùng riêng |
-| Tổng doanh thu, ngân hàng, thuế, quá hạn, Pending, chi tiền | Loại | Không thuộc nghiệp vụ hai trạng thái PAID/UNPAID |
-| Xuất Excel/PDF/JSON, email nhắc nợ, cài đặt, trợ giúp giả | Loại | Không có backend; nút export báo thành công bằng alert dù không sinh file |
-| Biểu đồ năm 2024, tỷ lệ tăng trưởng, tín nhiệm, ngân hàng | Loại | Toàn bộ là số liệu viết cố định hoặc suy diễn ngoài phạm vi |
-| Bảng báo cáo theo đơn vị/tháng | Giữ và nối dữ liệu thật | Hỗ trợ đối chiếu trực tiếp, không cần biểu đồ trang trí |
-| Script thay class/DOM, onclick và parseFloat tính tiền | Thay | React state; backend Decimal làm tròn HALF_UP; preview frontend dùng BigInt |
-| Login và sao lưu SQLite | Bổ sung | Yêu cầu bắt buộc mới; backup là tác vụ I/O thật trong thread pool |
+| PayTrack branding, orange palette, light background, left navigation | Retain and refine | The identity and structure fit a management application |
+| Four screens, KPIs, tables, filters, and dialog flows | Convert to Next.js/React | Use shared TypeScript components and real WebSocket data |
+| Be Vietnam Pro font | Retain and self-host through npm | Supports Vietnamese characters and removes the runtime CDN dependency |
+| Material Symbols and scattered SVGs | Replace with Lucide | Consistent strokes and sizes without downloading an icon font |
+| Repeated header/sidebar and fixed desktop dimensions | Adjust | One shared shell, bottom navigation on mobile, and tables scrolling within their own containers |
+| Total revenue, banking, taxes, overdue, Pending, and outgoing payments | Remove | Outside the two-state PAID/UNPAID business scope |
+| Fake Excel/PDF/JSON export, debt-reminder email, settings, and help | Remove | No backend implementation; export reports success through an alert without producing a file |
+| 2024 charts, growth rates, creditworthiness, and banking figures | Remove | All are hardcoded or inferred beyond the scope |
+| Organization/month report tables | Retain and connect to real data | Support direct reconciliation without decorative charts |
+| Class/DOM manipulation, onclick handlers, and parseFloat money calculations | Replace | React state; backend Decimal with HALF_UP rounding; frontend preview using BigInt |
+| Login and SQLite backup | Add | New required features; backup is real I/O work in a thread pool |
 
-## Lỗi tìm được trong nguồn
+## Issues Found in the Source
 
-- Các mục sidebar dùng `href="#"`; dashboard có `#details`, không có hệ thống route thật.
-- Màn hình khoản thu gọi `addReceivableModal` và `markPaidModal` nhưng không có các dialog tương ứng trong tài liệu.
-- Submit form đơn vị chỉ đóng modal, không lưu dữ liệu.
-- Bộ lọc, phân trang, chọn kiểu bảng/thẻ và nhiều nút chi tiết/sửa chưa nối nghiệp vụ.
-- Báo cáo đổi tháng/quý bằng đổi class nút, không tính lại thống kê.
-- Font icon được khai báo lặp, scrollbar bị ẩn toàn cục, select-none cản sao chép số liệu; một màn hình có width/height cố định và overflow hidden.
-- Các tổng, số lượng dòng và trạng thái ở nhiều màn hình không khớp nhau.
+- Sidebar items use `href="#"`; the dashboard uses `#details`, with no real routing system.
+- The payments screen calls `addReceivableModal` and `markPaidModal`, but the corresponding dialogs are missing from the document.
+- Submitting the organization form only closes the modal without saving data.
+- Filters, pagination, table/card view selection, and many detail/edit actions are not connected to business logic.
+- Reports switch month/quarter views by changing button classes without recalculating statistics.
+- Icon fonts are declared repeatedly, scrollbars are hidden globally, and select-none prevents copying figures; one screen has fixed width/height and overflow hidden.
+- Totals, row counts, and statuses are inconsistent across screens.
 
-Thư mục `stitch_javafx_payment_tracker_dashboard/` được giữ nguyên. Không dùng iframe hoặc dangerouslySetInnerHTML để chuyển đổi.
+The `stitch_javafx_payment_tracker_dashboard/` directory was preserved. Migration did not use iframes or dangerouslySetInnerHTML.
 
-Cập nhật 03/11/2026: theo yêu cầu tiếp theo của chủ dự án, font giao diện đã đổi từ Be Vietnam Pro sang Inter (tự host). Các nhận xét giữ font phía trên ghi lại quyết định chuyển đổi ban đầu.
-
+Update on 3 November 2026: following the project owner's subsequent request, the interface font was changed from Be Vietnam Pro to self-hosted Inter. The font-retention comments above record the original migration decision.

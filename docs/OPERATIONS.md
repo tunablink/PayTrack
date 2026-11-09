@@ -1,11 +1,11 @@
-# Vận hành local, VPS và dữ liệu
+# Local/VPS Operations and Data Management
 
-## Local
+## Local Development
 
-Yêu cầu Node.js 24 LTS và Python 3.13. Không cần Docker để chạy local.
+Requires Node.js 24 LTS and Python 3.13. Docker is not required for local development.
 
 ```powershell
-# Tại thư mục gốc; dùng executable Python đã cài thực tế nếu python/py là alias Windows Store.
+# From the repository root; use the installed Python executable if python/py is a Windows Store alias.
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r backend\requirements.lock.txt
 cd backend
@@ -13,7 +13,7 @@ cd backend
 ..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --ws-max-size 32768
 ```
 
-Terminal khác:
+In another terminal:
 
 ```powershell
 cd frontend
@@ -21,17 +21,17 @@ npm.cmd ci
 npm.cmd run dev
 ```
 
-Mở **http://localhost:3000**. Origin mặc định chính xác là địa chỉ này; nếu dùng 127.0.0.1 hoặc đổi port, đặt APP_ORIGIN cho backend và NEXT_PUBLIC_WS_URL cho frontend tương ứng. `.env.example` gốc là mẫu Compose. CLI/backend đọc biến môi trường của process, không tự nạp tệp .env. Next.js tự đọc `.env.local`; có thể sao chép `frontend/.env.example` thành tệp này.
+Open **http://localhost:3000**. The default Origin is exactly this address; if using 127.0.0.1 or a different port, set the backend APP_ORIGIN and frontend NEXT_PUBLIC_WS_URL accordingly. The root `.env.example` is a Compose template. The CLI/backend reads process environment variables and does not automatically load .env. Next.js automatically reads `.env.local`; copy `frontend/.env.example` to that file if needed.
 
-Trên Linux: `python3 -m venv .venv`, `.venv/bin/python`, `npm`; các lệnh còn lại giống nhau. Chạy CLI và backend từ `backend/` để DATA_DIR mặc định trỏ tới `data/` ở gốc repository. Có thể đặt DATA_DIR là đường dẫn tuyệt đối bên ngoài repository.
+On Linux, use `python3 -m venv .venv`, `.venv/bin/python`, and `npm`; other commands remain the same. Run the CLI and backend from `backend/` so the default DATA_DIR points to the root `data/` directory. DATA_DIR can also be an absolute path outside the repository.
 
-Một người có thể đăng ký nhiều tài khoản tại **http://localhost:3000/register** hoặc bấm **Đăng ký tài khoản** trên trang đăng nhập. Mỗi tài khoản cần tên đăng nhập khác nhau, mật khẩu tối thiểu 12 ký tự và xác nhận khớp. Sau khi tạo thành công, bấm **Đăng nhập**. Đăng ký không đóng khi đã có tài khoản. Đơn vị, khoản phải thu và thống kê được tách riêng theo tài khoản; đăng xuất rồi đăng nhập tài khoản khác để chuyển không gian dữ liệu. Giới hạn 10 yêu cầu đăng ký hợp lệ về schema/IP/15 phút để tránh lạm dụng; tên đăng nhập trùng trả lỗi và cho phép sửa tên ngay trong form.
+One person may register multiple accounts at **http://localhost:3000/register** or through the registration link on the login page. Each account needs a distinct username, a password of at least 12 characters, and matching confirmation. After successful registration, log in. Registration remains open when accounts already exist. Organizations, payments, and statistics are isolated by account; log out and log in to another account to switch workspaces. Registration is limited to 10 schema-valid requests/IP/15 minutes to reduce abuse; duplicate names produce an error while retaining the form for correction.
 
-Lệnh `python -m app.cli setup` tạo tài khoản quản trị ban đầu qua terminal bằng getpass, chỉ khi chưa có tài khoản. Tài khoản cũ hoặc tài khoản đầu tiên trên database trống giữ quyền quản trị chức năng sao lưu toàn hệ thống. Các tài khoản đăng ký sau không có quyền backup/status toàn hệ thống và không thấy nút sao lưu. Quyền quản trị không cho phép truy cập đơn vị/khoản thu của tài khoản khác qua API nghiệp vụ.
+The `python -m app.cli setup` command creates the initial administrator through terminal getpass prompts, only when no accounts exist. The legacy account or first account in an empty database retains administrator access to whole-system backups. Subsequent registered accounts cannot access whole-system backup/status or see the backup button. Administrator privileges do not grant API access to another account's organizations/payments.
 
-**Nâng cấp database cũ:** dừng backend rồi chạy lại. Migration 002 tự tạo `DATA_DIR/backups/pre-migration-002-<id>.sqlite3` bằng SQLite backup API trước khi chuyển database phiên bản 1 sang 2. Username, hash mật khẩu, đơn vị, khoản thu, phiên bản bản ghi và session hợp lệ được giữ; dữ liệu cũ thuộc tài khoản ban đầu. Không xóa database để mở đăng ký. Nếu dùng Docker, dựng lại image và recreate backend với nguyên volume dữ liệu.
+**Upgrading an existing database:** stop and restart the backend. Before migrating database version 1 to 2, migration 002 automatically creates `DATA_DIR/backups/pre-migration-002-<id>.sqlite3` through the SQLite backup API. Usernames, password hashes, organizations, payments, record versions, and valid sessions are preserved; existing data belongs to the initial account. Do not delete the database to enable registration. With Docker, rebuild the image and recreate the backend while preserving the data volume.
 
-## Docker local
+## Local Docker
 
 ```bash
 cp .env.example .env
@@ -41,14 +41,14 @@ docker compose --env-file .env -f deploy/compose.yaml up -d
 docker compose --env-file .env -f deploy/compose.yaml ps
 ```
 
-Mở http://localhost (cổng 80). Frontend được build với `/ws`; Nginx chuyển HTTP và WebSocket cùng origin tới backend. Không expose cổng backend/database. Named volume `tracker-data` mount toàn bộ `/data`, gồm SQLite, WAL và backup.
+Open http://localhost on port 80. The frontend is built with `/ws`; Nginx forwards HTTP and WebSocket traffic to the backend under the same origin. Backend/database ports are not exposed. The `tracker-data` named volume mounts the entire `/data` directory, including SQLite, WAL, and backups.
 
-## VPS Linux có domain
+## Linux VPS with a Domain
 
-1. Chuẩn bị VPS đã có Docker Engine và Compose **>=2.24.4** (`!override` trong HTTPS override). Không tự mua tài nguyên bằng repo này.
-2. Trỏ DNS A/AAAA tới VPS, mở 80/443 và cổng SSH cần thiết; chỉ expose reverse proxy.
-3. Sao chép source và tạo `.env` riêng với `DOMAIN=tracker.ten-mien-cua-ban`, `APP_ORIGIN=https://tracker.ten-mien-cua-ban`, `COOKIE_SECURE=true`, `SESSION_SECONDS=28800`.
-4. Dùng cả hai compose file để thay Nginx bằng Caddy, tự cấp/gia hạn TLS và hỗ trợ WebSocket upgrade:
+1. Prepare a VPS with Docker Engine and Compose **>=2.24.4** installed (`!override` is used in the HTTPS override). The repository does not purchase resources automatically.
+2. Point DNS A/AAAA records to the VPS, open ports 80/443 and the required SSH port, and expose only the reverse proxy.
+3. Copy the source and create a private `.env` with `DOMAIN=tracker.ten-mien-cua-ban`, `APP_ORIGIN=https://tracker.ten-mien-cua-ban`, `COOKIE_SECURE=true`, and `SESSION_SECONDS=28800`.
+4. Use both Compose files to replace Nginx with Caddy for automatic TLS issuance/renewal and WebSocket upgrades:
 
 ```bash
 docker compose --env-file .env -f deploy/compose.yaml -f deploy/compose.https.yaml build
@@ -57,13 +57,13 @@ docker compose --env-file .env -f deploy/compose.yaml -f deploy/compose.https.ya
 docker compose --env-file .env -f deploy/compose.yaml -f deploy/compose.https.yaml logs --tail=100
 ```
 
-Caddy lưu chứng chỉ trong volume riêng. Không bật Secure cookie khi thử HTTP local; phải bật Secure cho HTTPS production. Reverse proxy ghi đè X-Real-IP, backend chỉ tin header đó trong cấu hình secure. Một process backend, không scale replica SQLite và không dùng network filesystem cho thư mục dữ liệu.
+Caddy stores certificates in a separate volume. Do not enable Secure cookies for local HTTP testing; enable Secure for HTTPS production. The reverse proxy overwrites X-Real-IP, and the backend trusts that header only in secure configuration. Use one backend process, do not scale SQLite replicas, and do not put the data directory on a network filesystem.
 
 ## Backup
 
-Giao diện desktop có nút **Sao lưu dữ liệu** bên trái. Tác vụ `backup.start` dùng SQLite backup API trong thread pool; `backup.status` cho biết queued/running/completed/failed. Thành công chỉ khi đã hoàn tất và integrity_check=ok. File ở `DATA_DIR/backups/<job-id>.sqlite3`, không được phục vụ qua URL. Metadata job trong RAM mất khi restart.
+The desktop interface provides a **Data Backup** button on the left. `backup.start` uses the SQLite backup API in a thread pool; `backup.status` reports queued/running/completed/failed. Success is reported only after completion and integrity_check=ok. Files are stored at `DATA_DIR/backups/<job-id>.sqlite3` and are not served through a URL. Job metadata in RAM is lost on restart.
 
-CLI local, chạy từ backend:
+Local CLI, run from backend:
 
 ```bash
 python -m app.cli backup --file /duong-dan-rieng/backup-2026-11-02.sqlite3
@@ -76,47 +76,47 @@ docker compose --env-file .env -f deploy/compose.yaml exec backend python -m app
 docker compose --env-file .env -f deploy/compose.yaml cp backend:/data/backups/manual-2026-11-02.sqlite3 ./backup-2026-11-02.sqlite3
 ```
 
-Thư mục đích được tạo khi cần; CLI từ chối ghi đè file đã có. Sao lưu cả snapshot nhất quán, không copy riêng `.sqlite3` khi WAL đang hoạt động. Backup chứa dữ liệu và hash mật khẩu/session, nên lưu riêng có quyền chặt chẽ và retention phù hợp. Không commit vào git.
+The destination directory is created when needed; the CLI refuses to overwrite existing files. Back up a consistent snapshot rather than copying only `.sqlite3` while WAL is active. Backups contain data and password/session hashes, so keep them private with restrictive permissions and an appropriate retention policy. Do not commit them to Git.
 
 ## Restore
 
-1. Dừng backend trước khi phục hồi; giữ một backup mới của dữ liệu hiện tại.
-2. CLI kiểm tra integrity của nguồn rồi dùng backup API để restore. Nhập `RESTORE` khi được yêu cầu. Toàn bộ session bị thu hồi.
+1. Stop the backend before restoring and retain a fresh backup of the current data.
+2. The CLI checks source integrity and restores through the backup API. Enter `RESTORE` when prompted. All sessions are revoked.
 
 ```bash
 # Local (backend/)
 python -m app.cli restore --file /duong-dan-rieng/backup-2026-11-02.sqlite3
-# Docker, khi file nguồn đã ở volume /data/backups
+# Docker, with the source file already in the /data/backups volume
 docker compose --env-file .env -f deploy/compose.yaml stop backend
 docker compose --env-file .env -f deploy/compose.yaml run --rm --no-deps backend python -m app.cli restore --file /data/backups/manual-2026-11-02.sqlite3
 docker compose --env-file .env -f deploy/compose.yaml up -d backend
 ```
 
-Đăng nhập lại, kiểm tra số đơn vị, khoản phải thu và tổng trước/sau. Bộ pytest tự thực hiện backup/restore sang SQLite tạm và đối chiếu tổng tiền, đồng thời chạy CLI backup/restore thật qua subprocess. Khi vận hành production vẫn cần diễn tập phục hồi trên bản sao trước.
+Log in again and compare organization/payment counts and totals before and after restoration. The pytest suite performs backup/restore against temporary SQLite databases and checks amounts; it also executes real CLI backup/restore subprocesses and verifies session revocation. Production operations still require a restore rehearsal on a copy first.
 
-## Update và kiểm tra persistence
+## Updates and Persistence Checks
 
-Backup trước, lấy source/lock mới, chạy `docker compose ... up -d --build`. Migration có version `PRAGMA user_version`, áp dụng khi startup, không tự seed. Không dùng `down -v` vì sẽ xóa volume. Sau recreate container: đăng nhập, so sánh tổng Dashboard/Report và kiểm tra health. Các migration sau cần tạo file tuần tự mới và thêm vào MIGRATIONS, không sửa migration đã áp dụng ở production.
+Back up first, fetch the updated source/lock file, and run `docker compose ... up -d --build`. Migrations use `PRAGMA user_version`, run at startup, and do not seed data automatically. Do not use `down -v`, which deletes volumes. After recreating containers, log in, compare Dashboard/Report totals, and check health. Future migrations must use new sequential files added to MIGRATIONS; do not edit migrations already applied in production.
 
-Image có restart policy, health check và log rotation 10MB × 3. Đọc `docker compose ... logs backend` để thấy action duration và thread name/ID backup; không có credentials/payload nghiệp vụ trong log ứng dụng. Reverse proxy mặc định không log body/cookie.
+The deployment configuration includes restart policies, health checks, and log rotation of 10 MB × 3. Use `docker compose ... logs backend` to inspect action duration and backup thread names/IDs; application logs do not include credentials or business payloads. The reverse proxy does not log bodies/cookies by default.
 
-## Seed demo và test
+## Demo Seed and Tests
 
-Seed chỉ chạy thủ công trên database demo trống:
+Seeding is manual and intended only for an empty demo database:
 
 ```bash
-# Trong backend; DATA_DIR phải là thư mục demo riêng.
+# From backend; DATA_DIR must point to a separate demo directory.
 python -m app.cli seed --confirm-empty-demo
 ```
 
 ```powershell
-# Backend từ backend/
+# Backend, from backend/
 ..\.venv\Scripts\python.exe -m pytest -q
-# Frontend từ frontend/
+# Frontend, from frontend/
 npm.cmd run lint
 npm.cmd run typecheck
 npm.cmd run build
 npm.cmd run test:e2e
 ```
 
-Playwright mặc định dùng Chrome đã cài; đổi `E2E_BROWSER_CHANNEL=msedge` nếu dùng Edge. Backend E2E tự tạo database tạm và mật khẩu ngẫu nhiên trong process env, không sửa dữ liệu local. Hai cổng 3000/8000 phải trống. Báo cáo/lỗi test ở frontend/test-results (gitignored); có thể chứa dữ liệu kiểm thử, không phát hành chúng.
+Playwright uses installed Chrome by default; set `E2E_BROWSER_CHANNEL=msedge` to use Edge. The E2E backend creates a separate temporary database and a random password in process environment variables, without modifying local data. Ports 3000/8000 must be free. Test reports/errors are stored in frontend/test-results (Git-ignored); they may contain test data and should not be published.
